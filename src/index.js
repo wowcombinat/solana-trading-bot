@@ -1,5 +1,5 @@
-// src/index.js
 const express = require('express');
+const path = require('path');
 const { Connection, PublicKey, Keypair } = require('@solana/web3.js');
 const { getWallets, saveWallets } = require('./wallets');
 require('dotenv').config();
@@ -7,15 +7,19 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-const connection = new Connection(process.env.SOLANA_RPC_URL, 'confirmed');
+const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com', 'confirmed');
 
 app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send('Solana Trading Bot is running');
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, '../client/build')));
+
+app.get('/api/wallets', (req, res) => {
+  const wallets = getWallets();
+  res.json(wallets);
 });
 
-app.post('/add-wallet', (req, res) => {
+app.post('/api/add-wallet', (req, res) => {
   const { privateKey, isMaster } = req.body;
   
   if (!privateKey) {
@@ -42,12 +46,7 @@ app.post('/add-wallet', (req, res) => {
   }
 });
 
-app.get('/wallets', (req, res) => {
-  const wallets = getWallets();
-  res.json(wallets);
-});
-
-app.get('/balance/:address', async (req, res) => {
+app.get('/api/balance/:address', async (req, res) => {
   try {
     const publicKey = new PublicKey(req.params.address);
     const balance = await connection.getBalance(publicKey);
@@ -57,25 +56,11 @@ app.get('/balance/:address', async (req, res) => {
   }
 });
 
-// Функция для мониторинга транзакций мастер-кошелька
-async function monitorMasterWallet() {
-  const wallets = getWallets();
-  if (!wallets.master) {
-    console.log('No master wallet set');
-    return;
-  }
-
-  const masterPublicKey = new PublicKey(wallets.master.publicKey);
-
-  console.log(`Monitoring transactions for master wallet: ${wallets.master.publicKey}`);
-
-  connection.onLogs(masterPublicKey, (logs) => {
-    console.log('New transaction detected:', logs);
-    // Здесь будет логика для обработки транзакций и выполнения действий на follower-кошельках
-  }, 'confirmed');
-}
-
-monitorMasterWallet();
+// The "catchall" handler: for any request that doesn't
+// match one above, send back React's index.html file.
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build/index.html'));
+});
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
