@@ -16,6 +16,7 @@ const Input = styled.input`
   padding: 10px;
   margin-right: 10px;
   border-radius: 5px;
+  width: 80%;
 `;
 
 const Button = styled.button`
@@ -38,13 +39,20 @@ const ErrorMessage = styled.div`
   margin-top: 10px;
 `;
 
+const SuccessMessage = styled.div`
+  color: #00ff00;
+  margin-top: 10px;
+`;
+
 const WalletManager = () => {
   const [privateKey, setPrivateKey] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleAddWallet = async () => {
     try {
       setError('');
+      setSuccess('');
       const response = await fetch('/api/add-wallet', {
         method: 'POST',
         headers: {
@@ -54,7 +62,7 @@ const WalletManager = () => {
       });
       const data = await response.json();
       if (response.ok) {
-        console.log(data);
+        setSuccess(`Wallet added successfully. Public key: ${data.publicKey}`);
         setPrivateKey('');
       } else {
         setError(data.error);
@@ -72,10 +80,11 @@ const WalletManager = () => {
         type="text"
         value={privateKey}
         onChange={(e) => setPrivateKey(e.target.value)}
-        placeholder="Enter private key (64 hex characters)"
+        placeholder="Enter private key (base58 encoded)"
       />
       <Button onClick={handleAddWallet}>Add Wallet</Button>
       {error && <ErrorMessage>{error}</ErrorMessage>}
+      {success && <SuccessMessage>{success}</SuccessMessage>}
     </WalletWrapper>
   );
 };
