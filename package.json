@@ -4,7 +4,8 @@
   "description": "Solana Trading Bot",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "heroku-postbuild": "cd client && npm install && npm run build"
   },
   "dependencies": {
     "express": "^4.17.1",
