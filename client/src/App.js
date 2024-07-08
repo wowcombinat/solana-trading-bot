@@ -1,7 +1,7 @@
 import React from 'react';
 import styled, { createGlobalStyle } from 'styled-components';
-import Terminal from './components/Terminal';
 import WalletManager from './components/WalletManager';
+import MotivationalBanner from './components/MotivationalBanner';
 
 const GlobalStyle = createGlobalStyle`
   body {
@@ -18,22 +18,4 @@ const AppWrapper = styled.div`
 `;
 
 const Title = styled.h1`
-  text-align: center;
-  color: #00ffff;
-  text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff, 0 0 40px #00ffff;
-`;
-
-function App() {
-  return (
-    <>
-      <GlobalStyle />
-      <AppWrapper>
-        <Title>Solana Trading Bot</Title>
-        <Terminal />
-        <WalletManager />
-      </AppWrapper>
-    </>
-  );
-}
-
-export default App;
+  text-align: center
