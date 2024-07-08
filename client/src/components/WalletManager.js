@@ -33,11 +33,18 @@ const Button = styled.button`
   }
 `;
 
+const ErrorMessage = styled.div`
+  color: #ff0000;
+  margin-top: 10px;
+`;
+
 const WalletManager = () => {
   const [privateKey, setPrivateKey] = useState('');
+  const [error, setError] = useState('');
 
   const handleAddWallet = async () => {
     try {
+      setError('');
       const response = await fetch('/api/add-wallet', {
         method: 'POST',
         headers: {
@@ -46,10 +53,15 @@ const WalletManager = () => {
         body: JSON.stringify({ privateKey, isMaster: false }),
       });
       const data = await response.json();
-      console.log(data);
-      setPrivateKey('');
+      if (response.ok) {
+        console.log(data);
+        setPrivateKey('');
+      } else {
+        setError(data.error);
+      }
     } catch (error) {
       console.error('Error adding wallet:', error);
+      setError('Failed to add wallet. Please try again.');
     }
   };
 
@@ -60,9 +72,10 @@ const WalletManager = () => {
         type="text"
         value={privateKey}
         onChange={(e) => setPrivateKey(e.target.value)}
-        placeholder="Enter private key"
+        placeholder="Enter private key (64 hex characters)"
       />
       <Button onClick={handleAddWallet}>Add Wallet</Button>
+      {error && <ErrorMessage>{error}</ErrorMessage>}
     </WalletWrapper>
   );
 };
