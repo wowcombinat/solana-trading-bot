@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled, { createGlobalStyle } from 'styled-components';
 import WalletManager from './components/WalletManager';
 import MotivationalBanner from './components/MotivationalBanner';
+import Auth from './components/Auth';
 
 const GlobalStyle = createGlobalStyle`
   body {
@@ -24,13 +25,26 @@ const Title = styled.h1`
 `;
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
   return (
     <>
       <GlobalStyle />
       <AppWrapper>
         <Title>Solana Trading Bot</Title>
         <MotivationalBanner />
-        <WalletManager />
+        {isAuthenticated ? (
+          <WalletManager />
+        ) : (
+          <Auth setIsAuthenticated={setIsAuthenticated} />
+        )}
       </AppWrapper>
     </>
   );
