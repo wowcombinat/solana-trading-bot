@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const { Connection, PublicKey, Keypair } = require('@solana/web3.js');
 const { getWallets, saveWallets } = require('./wallets');
+const bs58 = require('bs58');
 require('dotenv').config();
 
 const app = express();
@@ -27,12 +28,15 @@ app.post('/api/add-wallet', (req, res) => {
   }
 
   try {
-    // Проверка формата privateKey (должен быть шестнадцатеричной строкой)
-    if (!/^[0-9a-fA-F]+$/.test(privateKey) || privateKey.length !== 64) {
-      throw new Error('Invalid private key format');
+    // Декодируем base58-encoded приватный ключ
+    const decodedPrivateKey = bs58.decode(privateKey);
+    
+    // Проверяем, что длина декодированного ключа равна 64 байтам (512 бит)
+    if (decodedPrivateKey.length !== 64) {
+      throw new Error('Invalid private key length');
     }
 
-    const keypair = Keypair.fromSecretKey(Buffer.from(privateKey, 'hex'));
+    const keypair = Keypair.fromSecretKey(decodedPrivateKey);
     const publicKey = keypair.publicKey.toString();
 
     const wallets = getWallets();
