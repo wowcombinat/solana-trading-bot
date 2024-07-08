@@ -1,6 +1,17 @@
 {
+  "name": "solana-trading-bot",
+  "version": "1.0.0",
+  "description": "Solana Trading Bot",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "@solana/web3.js": "^1.30.2",
+    "dotenv": "^10.0.0"
+  },
+  "engines": {
+    "node": "20.x"
   }
 }
