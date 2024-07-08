@@ -43,7 +43,7 @@ app.post('/api/add-wallet', (req, res) => {
       publicKey,
       privateKey,
       accountName,
-      operationAmount,
+      operationAmount: isMaster ? null : operationAmount,
       slippage,
       fee,
       isMaster
@@ -62,6 +62,51 @@ app.post('/api/add-wallet', (req, res) => {
     console.error('Error adding wallet:', error);
     res.status(400).json({ error: error.message || 'Invalid private key' });
   }
+});
+
+app.put('/api/edit-wallet/:publicKey', (req, res) => {
+  const { publicKey } = req.params;
+  const { accountName, operationAmount, slippage, fee } = req.body;
+
+  const wallets = getWallets();
+  let updatedWallet;
+
+  if (wallets.master && wallets.master.publicKey === publicKey) {
+    updatedWallet = wallets.master;
+  } else {
+    updatedWallet = wallets.followers.find(w => w.publicKey === publicKey);
+  }
+
+  if (!updatedWallet) {
+    return res.status(404).json({ error: 'Wallet not found' });
+  }
+
+  updatedWallet.accountName = accountName;
+  if (!updatedWallet.isMaster) {
+    updatedWallet.operationAmount = operationAmount;
+  }
+  updatedWallet.slippage = slippage;
+  updatedWallet.fee = fee;
+
+  saveWallets(wallets);
+
+  res.json({ message: 'Wallet updated successfully', publicKey });
+});
+
+app.delete('/api/delete-wallet/:publicKey', (req, res) => {
+  const { publicKey } = req.params;
+
+  const wallets = getWallets();
+
+  if (wallets.master && wallets.master.publicKey === publicKey) {
+    wallets.master = null;
+  } else {
+    wallets.followers = wallets.followers.filter(w => w.publicKey !== publicKey);
+  }
+
+  saveWallets(wallets);
+
+  res.json({ message: 'Wallet deleted successfully' });
 });
 
 app.get('/api/balance/:address', async (req, res) => {
