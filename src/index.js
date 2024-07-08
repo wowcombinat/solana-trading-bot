@@ -27,6 +27,11 @@ app.post('/api/add-wallet', (req, res) => {
   }
 
   try {
+    // Проверка формата privateKey (должен быть шестнадцатеричной строкой)
+    if (!/^[0-9a-fA-F]+$/.test(privateKey) || privateKey.length !== 64) {
+      throw new Error('Invalid private key format');
+    }
+
     const keypair = Keypair.fromSecretKey(Buffer.from(privateKey, 'hex'));
     const publicKey = keypair.publicKey.toString();
 
@@ -42,7 +47,8 @@ app.post('/api/add-wallet', (req, res) => {
 
     res.json({ message: 'Wallet added successfully', publicKey });
   } catch (error) {
-    res.status(400).json({ error: 'Invalid private key' });
+    console.error('Error adding wallet:', error);
+    res.status(400).json({ error: error.message || 'Invalid private key' });
   }
 });
 
