@@ -21,17 +21,15 @@ app.get('/api/wallets', (req, res) => {
 });
 
 app.post('/api/add-wallet', (req, res) => {
-  const { privateKey, isMaster } = req.body;
+  const { privateKey, accountName, operationAmount, slippage, fee, isMaster } = req.body;
   
   if (!privateKey) {
     return res.status(400).json({ error: 'Private key is required' });
   }
 
   try {
-    // Декодируем base58-encoded приватный ключ
     const decodedPrivateKey = bs58.decode(privateKey);
     
-    // Проверяем, что длина декодированного ключа равна 64 байтам (512 бит)
     if (decodedPrivateKey.length !== 64) {
       throw new Error('Invalid private key length');
     }
@@ -41,10 +39,20 @@ app.post('/api/add-wallet', (req, res) => {
 
     const wallets = getWallets();
 
+    const newWallet = {
+      publicKey,
+      privateKey,
+      accountName,
+      operationAmount,
+      slippage,
+      fee,
+      isMaster
+    };
+
     if (isMaster) {
-      wallets.master = { publicKey, privateKey };
+      wallets.master = newWallet;
     } else {
-      wallets.followers.push({ publicKey, privateKey });
+      wallets.followers.push(newWallet);
     }
 
     saveWallets(wallets);
