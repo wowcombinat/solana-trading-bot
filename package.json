@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "heroku-postbuild": "cd client && npm install && npm run build"
+    "heroku-postbuild": "NPM_CONFIG_PRODUCTION=false npm install --prefix client && npm run build --prefix client"
   },
   "dependencies": {
     "express": "^4.17.1",
@@ -15,9 +15,11 @@
     "jsonwebtoken": "^8.5.1",
     "dotenv": "^10.0.0",
     "bs58": "^4.0.1",
-    "bip39": "^3.0.4"
+    "bip39": "^3.0.4",
+    "solana-swap": "^1.0.14"
   },
   "engines": {
-    "node": "16.x"
+    "node": "16.x",
+    "npm": "8.x"
   }
 }
