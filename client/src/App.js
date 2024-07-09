@@ -32,13 +32,20 @@ function App() {
     setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    setIsAuthenticated(false);
+    setUsername('');
+  };
+
   return (
     <ThemeProvider theme={theme === 'light' ? lightTheme : darkTheme}>
       <GlobalStyles />
       <AppWrapper>
         <Header 
           isAuthenticated={isAuthenticated} 
-          setIsAuthenticated={setIsAuthenticated}
+          handleLogout={handleLogout}
           toggleTheme={toggleTheme}
           theme={theme}
           username={username}
