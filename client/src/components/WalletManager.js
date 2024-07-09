@@ -26,6 +26,14 @@ const Input = styled.input`
   color: ${props => props.theme.text};
 `;
 
+const Select = styled.select`
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid ${props => props.theme.borderColor};
+  background-color: ${props => props.theme.background};
+  color: ${props => props.theme.text};
+`;
+
 const Button = styled.button`
   background-color: ${props => props.theme.secondary};
   color: white;
@@ -62,15 +70,17 @@ const ErrorMessage = styled.p`
 function WalletManager({ wallets, onWalletAdded }) {
   const [privateKey, setPrivateKey] = useState('');
   const [accountName, setAccountName] = useState('');
+  const [walletType, setWalletType] = useState('follower');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      await axios.post('/api/add-wallet', { privateKey, accountName });
+      await axios.post('/api/add-wallet', { privateKey, accountName, isMaster: walletType === 'master' });
       setPrivateKey('');
       setAccountName('');
+      setWalletType('follower');
       onWalletAdded();
     } catch (error) {
       console.error('Error adding wallet:', error);
@@ -94,6 +104,13 @@ function WalletManager({ wallets, onWalletAdded }) {
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
         />
+        <Select
+          value={walletType}
+          onChange={(e) => setWalletType(e.target.value)}
+        >
+          <option value="follower">Follower</option>
+          <option value="master">Master</option>
+        </Select>
         <Button type="submit">Add Wallet</Button>
       </Form>
       {error && <ErrorMessage>{error}</ErrorMessage>}
@@ -103,6 +120,7 @@ function WalletManager({ wallets, onWalletAdded }) {
           <WalletItem key={wallet.public_key}>
             <span>{wallet.account_name}</span>
             <span>{wallet.public_key.slice(0, 10)}...</span>
+            <span>{wallet.is_master ? 'Master' : 'Follower'}</span>
           </WalletItem>
         ))}
       </WalletList>
