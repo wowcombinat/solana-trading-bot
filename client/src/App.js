@@ -27,11 +27,17 @@ function App() {
     }
   }, []);
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+    setIsAuthenticated(false);
+  };
+
   return (
     <AppWrapper>
       <Title>Solana Trading Bot</Title>
       {isAuthenticated ? (
-        <Dashboard setIsAuthenticated={setIsAuthenticated} />
+        <Dashboard handleLogout={handleLogout} />
       ) : (
         <Auth setIsAuthenticated={setIsAuthenticated} />
       )}
