@@ -8,10 +8,6 @@ const WalletManagerWrapper = styled.div`
   gap: 20px;
 `;
 
-const Title = styled.h2`
-  color: ${props => props.theme.primary};
-`;
-
 const Form = styled.form`
   display: flex;
   flex-direction: column;
@@ -22,16 +18,6 @@ const Input = styled.input`
   padding: 10px;
   border-radius: 5px;
   border: 1px solid ${props => props.theme.borderColor};
-  background-color: ${props => props.theme.background};
-  color: ${props => props.theme.text};
-`;
-
-const Select = styled.select`
-  padding: 10px;
-  border-radius: 5px;
-  border: 1px solid ${props => props.theme.borderColor};
-  background-color: ${props => props.theme.background};
-  color: ${props => props.theme.text};
 `;
 
 const Button = styled.button`
@@ -64,23 +50,21 @@ const WalletItem = styled.li`
 `;
 
 const ErrorMessage = styled.p`
-  color: ${props => props.theme.accent};
+  color: ${props => props.theme.error};
 `;
 
-function WalletManager({ wallets, onWalletAdded }) {
+function WalletManager({ wallets, onWalletAdded, onWalletDeleted }) {
   const [privateKey, setPrivateKey] = useState('');
   const [accountName, setAccountName] = useState('');
-  const [walletType, setWalletType] = useState('follower');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      await axios.post('/api/add-wallet', { privateKey, accountName, isMaster: walletType === 'master' });
+      await axios.post('/api/add-wallet', { privateKey, accountName });
       setPrivateKey('');
       setAccountName('');
-      setWalletType('follower');
       onWalletAdded();
     } catch (error) {
       console.error('Error adding wallet:', error);
@@ -88,9 +72,19 @@ function WalletManager({ wallets, onWalletAdded }) {
     }
   };
 
+  const handleDelete = async (publicKey) => {
+    try {
+      await axios.delete(`/api/delete-wallet/${publicKey}`);
+      onWalletDeleted();
+    } catch (error) {
+      console.error('Error deleting wallet:', error);
+      setError(error.response?.data?.error || 'Failed to delete wallet');
+    }
+  };
+
   return (
     <WalletManagerWrapper>
-      <Title>Wallet Manager</Title>
+      <h3>Add New Wallet</h3>
       <Form onSubmit={handleSubmit}>
         <Input
           type="text"
@@ -104,23 +98,16 @@ function WalletManager({ wallets, onWalletAdded }) {
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
         />
-        <Select
-          value={walletType}
-          onChange={(e) => setWalletType(e.target.value)}
-        >
-          <option value="follower">Follower</option>
-          <option value="master">Master</option>
-        </Select>
         <Button type="submit">Add Wallet</Button>
       </Form>
       {error && <ErrorMessage>{error}</ErrorMessage>}
 
+      <h3>Your Wallets</h3>
       <WalletList>
         {wallets.map((wallet) => (
           <WalletItem key={wallet.public_key}>
-            <span>{wallet.account_name}</span>
-            <span>{wallet.public_key.slice(0, 10)}...</span>
-            <span>{wallet.is_master ? 'Master' : 'Follower'}</span>
+            <span>{wallet.account_name} - {wallet.public_key.slice(0, 10)}...</span>
+            <Button onClick={() => handleDelete(wallet.public_key)}>Delete</Button>
           </WalletItem>
         ))}
       </WalletList>
