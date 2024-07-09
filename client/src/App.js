@@ -17,11 +17,14 @@ const AppWrapper = styled.div`
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [theme, setTheme] = useState('light');
+  const [username, setUsername] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
+    const storedUsername = localStorage.getItem('username');
+    if (token && storedUsername) {
       setIsAuthenticated(true);
+      setUsername(storedUsername);
     }
   }, []);
 
@@ -38,11 +41,12 @@ function App() {
           setIsAuthenticated={setIsAuthenticated}
           toggleTheme={toggleTheme}
           theme={theme}
+          username={username}
         />
         {isAuthenticated ? (
-          <Dashboard />
+          <Dashboard username={username} />
         ) : (
-          <Auth setIsAuthenticated={setIsAuthenticated} />
+          <Auth setIsAuthenticated={setIsAuthenticated} setUsername={setUsername} />
         )}
       </AppWrapper>
     </ThemeProvider>
