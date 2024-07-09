@@ -138,11 +138,7 @@ app.post('/api/add-wallet', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/create-wallet', authenticateToken, async (req, res) => {
-  const { accountName, isMaster, password } = req.body;
-
-  if (!password || typeof password !== 'string') {
-    return res.status(400).json({ error: 'Password is required and must be a string' });
-  }
+  const { accountName, isMaster } = req.body;
   
   try {
     const mnemonic = bip39.generateMnemonic();
@@ -151,22 +147,9 @@ app.post('/api/create-wallet', authenticateToken, async (req, res) => {
     const publicKey = keypair.publicKey.toString();
     const privateKey = bs58.encode(keypair.secretKey);
 
-    // Шифруем приватный ключ и мнемоническую фразу
-    const algorithm = 'aes-256-cbc';
-    const key = crypto.scryptSync(password, 'salt', 32);
-    const iv = crypto.randomBytes(16);
-
-    const cipher = crypto.createCipheriv(algorithm, key, iv);
-    let encryptedPrivateKey = cipher.update(privateKey, 'utf8', 'hex');
-    encryptedPrivateKey += cipher.final('hex');
-
-    const mnemonicCipher = crypto.createCipheriv(algorithm, key, iv);
-    let encryptedMnemonic = mnemonicCipher.update(mnemonic, 'utf8', 'hex');
-    encryptedMnemonic += mnemonicCipher.final('hex');
-
     await pool.query(
       'INSERT INTO wallets (username, public_key, private_key, mnemonic, account_name, is_master) VALUES ($1, $2, $3, $4, $5, $6)',
-      [req.user.username, publicKey, encryptedPrivateKey, encryptedMnemonic, accountName, isMaster]
+      [req.user.username, publicKey, privateKey, mnemonic, accountName, isMaster]
     );
 
     res.json({ message: 'Wallet created successfully', publicKey });
@@ -177,11 +160,7 @@ app.post('/api/create-wallet', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/get-wallet-details', authenticateToken, async (req, res) => {
-  const { publicKey, password } = req.body;
-
-  if (!password || typeof password !== 'string') {
-    return res.status(400).json({ error: 'Password is required and must be a string' });
-  }
+  const { publicKey } = req.body;
 
   try {
     const result = await pool.query('SELECT private_key, mnemonic FROM wallets WHERE public_key = $1 AND username = $2', [publicKey, req.user.username]);
@@ -192,20 +171,7 @@ app.post('/api/get-wallet-details', authenticateToken, async (req, res) => {
 
     const { private_key: encryptedPrivateKey, mnemonic: encryptedMnemonic } = result.rows[0];
 
-    // Расшифровываем приватный ключ и мнемоническую фразу
-    const algorithm = 'aes-256-cbc';
-    const key = crypto.scryptSync(password, 'salt', 32);
-    const iv = Buffer.alloc(16, 0); // инициализационный вектор, используемый при шифровании
-
-    const decipher = crypto.createDecipheriv(algorithm, key, iv);
-    let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
-    privateKey += decipher.final('utf8');
-
-    const mnemonicDecipher = crypto.createDecipheriv(algorithm, key, iv);
-    let mnemonic = mnemonicDecipher.update(encryptedMnemonic, 'hex', 'utf8');
-    mnemonic += mnemonicDecipher.final('utf8');
-
-    res.json({ privateKey, mnemonic });
+    res.json({ privateKey: encryptedPrivateKey, mnemonic: encryptedMnemonic });
   } catch (error) {
     console.error('Error getting wallet details:', error);
     res.status(500).json({ error: 'Failed to get wallet details' });
