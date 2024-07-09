@@ -18,6 +18,7 @@ const Logo = styled.h1`
 const NavButtons = styled.div`
   display: flex;
   gap: 10px;
+  align-items: center;
 `;
 
 const Button = styled.button`
@@ -34,9 +35,15 @@ const Button = styled.button`
   }
 `;
 
-const Header = ({ isAuthenticated, setIsAuthenticated, toggleTheme, theme }) => {
+const Username = styled.span`
+  margin-right: 15px;
+  font-weight: bold;
+`;
+
+const Header = ({ isAuthenticated, setIsAuthenticated, toggleTheme, theme, username }) => {
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('username');
     setIsAuthenticated(false);
   };
 
@@ -44,6 +51,7 @@ const Header = ({ isAuthenticated, setIsAuthenticated, toggleTheme, theme }) => 
     <HeaderWrapper>
       <Logo>SolanaTrader</Logo>
       <NavButtons>
+        {isAuthenticated && <Username>Welcome, {username}!</Username>}
         <Button onClick={toggleTheme}>
           {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
         </Button>
