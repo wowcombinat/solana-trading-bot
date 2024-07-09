@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "heroku-postbuild": "NPM_CONFIG_PRODUCTION=false npm install --prefix client && npm run build --prefix client"
+    "heroku-prebuild": "npm install --force",
+    "heroku-postbuild": "npm install --prefix client --force && npm run build --prefix client"
   },
   "dependencies": {
     "express": "^4.17.1",
