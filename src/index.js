@@ -47,10 +47,18 @@ const authenticateToken = (req, res, next) => {
 
 app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
+  
+  console.log('Received registration request:', { username, password: '****' });
+
+  if (!username || !password) {
+    console.log('Registration failed: Missing username or password');
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
 
   try {
     const userCheck = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
     if (userCheck.rows.length > 0) {
+      console.log('Registration failed: Username already exists');
       return res.status(400).json({ error: 'Username already exists' });
     }
 
@@ -58,6 +66,7 @@ app.post('/api/register', async (req, res) => {
     await pool.query('INSERT INTO users (username, password) VALUES ($1, $2)', [username, hashedPassword]);
 
     const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    console.log('Registration successful for user:', username);
     res.json({ token });
   } catch (error) {
     console.error('Error registering user:', error);
@@ -68,19 +77,24 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
 
+  console.log('Received login request:', { username, password: '****' });
+
   try {
     const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
     if (result.rows.length === 0) {
+      console.log('Login failed: Invalid username');
       return res.status(400).json({ error: 'Invalid username or password' });
     }
 
     const user = result.rows[0];
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
+      console.log('Login failed: Invalid password');
       return res.status(400).json({ error: 'Invalid username or password' });
     }
 
     const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    console.log('Login successful for user:', username);
     res.json({ token });
   } catch (error) {
     console.error('Error logging in:', error);
@@ -120,6 +134,7 @@ app.post('/api/add-wallet', authenticateToken, async (req, res) => {
       [req.user.username, publicKey, privateKey, accountName, operationAmount, slippage, fee, isMaster]
     );
 
+    console.log('Wallet added successfully:', { publicKey, accountName, isMaster });
     res.json({ message: 'Wallet added successfully', publicKey });
   } catch (error) {
     console.error('Error adding wallet:', error);
@@ -141,6 +156,7 @@ app.put('/api/edit-wallet/:publicKey', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Wallet not found' });
     }
 
+    console.log('Wallet updated successfully:', { publicKey, accountName });
     res.json({ message: 'Wallet updated successfully', wallet: result.rows[0] });
   } catch (error) {
     console.error('Error updating wallet:', error);
@@ -158,6 +174,7 @@ app.delete('/api/delete-wallet/:publicKey', authenticateToken, async (req, res) 
       return res.status(404).json({ error: 'Wallet not found' });
     }
 
+    console.log('Wallet deleted successfully:', { publicKey });
     res.json({ message: 'Wallet deleted successfully' });
   } catch (error) {
     console.error('Error deleting wallet:', error);
@@ -171,6 +188,7 @@ app.get('/api/balance/:address', authenticateToken, async (req, res) => {
     const balance = await connection.getBalance(publicKey);
     res.json({ balance: balance / 1e9 }); // Convert lamports to SOL
   } catch (error) {
+    console.error('Error fetching balance:', error);
     res.status(400).json({ error: error.message });
   }
 });
