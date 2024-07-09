@@ -2,15 +2,13 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Connection, PublicKey, Keypair, Transaction } from "@solana/web3.js";
-import pkg from 'pg';
-const { Pool } = pkg;
+import { Pool } from 'pg';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import bs58 from 'bs58';
 import { SolanaTracker } from "solana-swap";
 import dotenv from 'dotenv';
-import crypto from 'crypto';
-import * as bip39 from 'bip39';
+import { createCipheriv, randomBytes } from 'crypto';
 
 dotenv.config();
 
@@ -94,10 +92,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-app.get('/api/user', authenticateToken, (req, res) => {
-  res.json({ username: req.user.username });
-});
-
 app.get('/api/wallets', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM wallets WHERE username = $1', [req.user.username]);
@@ -138,61 +132,24 @@ app.post('/api/add-wallet', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/create-wallet', authenticateToken, async (req, res) => {
-  const { accountName, isMaster, password } = req.body;
-  
+  const { accountName, isMaster } = req.body;
   try {
-    const mnemonic = bip39.generateMnemonic();
-    const seed = await bip39.mnemonicToSeed(mnemonic);
+    const { generateMnemonic, mnemonicToSeed } = await import('bip39');
+    const mnemonic = generateMnemonic();
+    const seed = await mnemonicToSeed(mnemonic);
     const keypair = Keypair.fromSeed(seed.slice(0, 32));
     const publicKey = keypair.publicKey.toString();
     const privateKey = bs58.encode(keypair.secretKey);
 
-    // Шифруем приватный ключ и мнемоническую фразу
-    const cipher = crypto.createCipher('aes-256-cbc', password);
-    let encryptedPrivateKey = cipher.update(privateKey, 'utf8', 'hex');
-    encryptedPrivateKey += cipher.final('hex');
-
-    const mnemonicCipher = crypto.createCipher('aes-256-cbc', password);
-    let encryptedMnemonic = mnemonicCipher.update(mnemonic, 'utf8', 'hex');
-    encryptedMnemonic += mnemonicCipher.final('hex');
-
     await pool.query(
-      'INSERT INTO wallets (username, public_key, private_key, mnemonic, account_name, is_master) VALUES ($1, $2, $3, $4, $5, $6)',
-      [req.user.username, publicKey, encryptedPrivateKey, encryptedMnemonic, accountName, isMaster]
+      'INSERT INTO wallets (username, public_key, private_key, account_name, is_master) VALUES ($1, $2, $3, $4, $5)',
+      [req.user.username, publicKey, privateKey, accountName, isMaster]
     );
 
-    res.json({ message: 'Wallet created successfully', publicKey });
+    res.json({ message: 'Wallet created successfully', publicKey, mnemonic });
   } catch (error) {
     console.error('Error creating wallet:', error);
     res.status(500).json({ error: 'Failed to create wallet' });
-  }
-});
-
-app.post('/api/get-wallet-details', authenticateToken, async (req, res) => {
-  const { publicKey, password } = req.body;
-
-  try {
-    const result = await pool.query('SELECT private_key, mnemonic FROM wallets WHERE public_key = $1 AND username = $2', [publicKey, req.user.username]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Wallet not found' });
-    }
-
-    const { private_key: encryptedPrivateKey, mnemonic: encryptedMnemonic } = result.rows[0];
-
-    // Расшифровываем приватный ключ и мнемоническую фразу
-    const decipher = crypto.createDecipher('aes-256-cbc', password);
-    let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
-    privateKey += decipher.final('utf8');
-
-    const mnemonicDecipher = crypto.createDecipher('aes-256-cbc', password);
-    let mnemonic = mnemonicDecipher.update(encryptedMnemonic, 'hex', 'utf8');
-    mnemonic += mnemonicDecipher.final('utf8');
-
-    res.json({ privateKey, mnemonic });
-  } catch (error) {
-    console.error('Error getting wallet details:', error);
-    res.status(500).json({ error: 'Failed to get wallet details' });
   }
 });
 
@@ -237,8 +194,6 @@ app.get('/api/balance/:address', authenticateToken, async (req, res) => {
   }
 });
 
-const SOL_ADDRESS = "So11111111111111111111111111111111111111112";
-
 app.post('/api/swap', authenticateToken, async (req, res) => {
   const { fromToken, toToken, amount, walletPublicKey } = req.body;
 
@@ -255,8 +210,8 @@ app.post('/api/swap', authenticateToken, async (req, res) => {
     const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
 
     const swapResponse = await solanaTracker.getSwapInstructions(
-      fromToken === 'SOL' ? SOL_ADDRESS : fromToken,
-      toToken === 'SOL' ? SOL_ADDRESS : toToken,
+      fromToken,
+      toToken,
       amount,
       1, // slippage
       walletPublicKey,
@@ -264,7 +219,7 @@ app.post('/api/swap', authenticateToken, async (req, res) => {
       false // Force legacy transaction for Jupiter
     );
 
-    // Здесь вы бы отправили транзакцию, но для безопасности мы просто возвращаем инструкции
+    // Here you would normally send the transaction, but for safety we're just returning the instructions
     res.json({ message: 'Swap instructions generated', instructions: swapResponse });
   } catch (error) {
     console.error('Error during swap:', error);
@@ -289,7 +244,7 @@ app.post('/api/bump', authenticateToken, async (req, res) => {
 
     // Perform buy
     const buyResponse = await solanaTracker.getSwapInstructions(
-      SOL_ADDRESS,
+      "So11111111111111111111111111111111111111112", // SOL address
       tokenAddress,
       bumpAmount,
       1, // slippage
@@ -301,7 +256,7 @@ app.post('/api/bump', authenticateToken, async (req, res) => {
     // Perform sell
     const sellResponse = await solanaTracker.getSwapInstructions(
       tokenAddress,
-      SOL_ADDRESS,
+      "So11111111111111111111111111111111111111112", // SOL address
       bumpAmount,
       1, // slippage
       walletPublicKey,
@@ -309,7 +264,7 @@ app.post('/api/bump', authenticateToken, async (req, res) => {
       false // Force legacy transaction for Jupiter
     );
 
-    // Здесь вы бы отправили эти транзакции, но для безопасности мы просто возвращаем инструкции
+    // Here you would normally send these transactions, but for safety we're just returning the instructions
     res.json({ message: 'Bump instructions generated', buyInstructions: buyResponse, sellInstructions: sellResponse });
   } catch (error) {
     console.error('Error during bump:', error);
