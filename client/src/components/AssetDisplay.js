@@ -34,7 +34,15 @@ function AssetDisplay({ wallets, assets }) {
         {wallets.map((wallet) => (
           <AssetItem key={wallet.public_key}>
             <span>{wallet.account_name}</span>
-            <span>{assets[wallet.public_key] || 0} SOL</span>
+            {assets[wallet.public_key] ? (
+              assets[wallet.public_key].error ? (
+                <span>Error: {assets[wallet.public_key].error}</span>
+              ) : (
+                <span>{assets[wallet.public_key].solBalance || 0} SOL</span>
+              )
+            ) : (
+              <span>Loading...</span>
+            )}
           </AssetItem>
         ))}
       </AssetList>
