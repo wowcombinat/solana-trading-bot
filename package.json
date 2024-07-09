@@ -19,7 +19,7 @@
     "solana-swap": "^1.0.14"
   },
   "engines": {
-    "node": "16.x"
-  },
-  "cacheDirectories": ["client/node_modules"]
+    "node": "16.x",
+    "npm": "8.x"
+  }
 }
