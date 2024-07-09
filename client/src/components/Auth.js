@@ -23,13 +23,19 @@ const Button = styled.button`
   margin-bottom: 10px;
 `;
 
+const ErrorMessage = styled.p`
+  color: red;
+`;
+
 function Auth({ setIsAuthenticated }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLogin, setIsLogin] = useState(true);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     try {
       const endpoint = isLogin ? '/api/login' : '/api/register';
       const response = await axios.post(endpoint, { username, password });
@@ -37,7 +43,8 @@ function Auth({ setIsAuthenticated }) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
       setIsAuthenticated(true);
     } catch (error) {
-      console.error('Authentication failed:', error.response.data.error);
+      console.error('Authentication failed:', error.response?.data?.error || error.message);
+      setError(error.response?.data?.error || 'Authentication failed');
     }
   };
 
@@ -59,6 +66,7 @@ function Auth({ setIsAuthenticated }) {
       <Button type="button" onClick={() => setIsLogin(!isLogin)}>
         Switch to {isLogin ? 'Register' : 'Login'}
       </Button>
+      {error && <ErrorMessage>{error}</ErrorMessage>}
     </Form>
   );
 }
