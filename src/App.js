@@ -1,18 +1,13 @@
 import React from 'react';
-import styled, { createGlobalStyle } from 'styled-components';
-import Terminal from './components/Terminal';
-import WalletManager from './components/WalletManager';
-
-const GlobalStyle = createGlobalStyle`
-  body {
-    background-color: #000;
-    color: #00ff00;
-    font-family: 'Courier New', monospace;
-  }
-`;
+import { BrowserRouter as Router, Route, Switch, Redirect } from 'react-router-dom';
+import styled from 'styled-components';
+import Login from './components/Login';
+import Register from './components/Register';
+import Dashboard from './components/Dashboard';
+import PrivateRoute from './components/PrivateRoute';
 
 const AppWrapper = styled.div`
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
 `;
@@ -25,14 +20,17 @@ const Title = styled.h1`
 
 function App() {
   return (
-    <>
-      <GlobalStyle />
+    <Router>
       <AppWrapper>
         <Title>Solana Trading Bot</Title>
-        <Terminal />
-        <WalletManager />
+        <Switch>
+          <Route path="/login" component={Login} />
+          <Route path="/register" component={Register} />
+          <PrivateRoute path="/dashboard" component={Dashboard} />
+          <Redirect from="/" to="/dashboard" />
+        </Switch>
       </AppWrapper>
-    </>
+    </Router>
   );
 }
 
