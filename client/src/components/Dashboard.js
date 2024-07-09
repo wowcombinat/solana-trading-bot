@@ -28,8 +28,8 @@ function Dashboard({ handleLogout }) {
       const response = await axios.get('/api/wallets');
       setWallets(response.data);
     } catch (error) {
-      console.error('Error fetching wallets:', error);
-      if (error.response && error.response.status === 401) {
+      console.error('Error fetching wallets:', error.response?.data?.error || error.message);
+      if (error.response && error.response.status === 403) {
         handleLogout();
       }
     }
