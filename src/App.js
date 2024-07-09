@@ -1,10 +1,7 @@
-import React from 'react';
-import { BrowserRouter as Router, Route, Switch, Redirect } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import Login from './components/Login';
-import Register from './components/Register';
+import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
-import PrivateRoute from './components/PrivateRoute';
 
 const AppWrapper = styled.div`
   max-width: 1200px;
@@ -19,18 +16,24 @@ const Title = styled.h1`
 `;
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
   return (
-    <Router>
-      <AppWrapper>
-        <Title>Solana Trading Bot</Title>
-        <Switch>
-          <Route path="/login" component={Login} />
-          <Route path="/register" component={Register} />
-          <PrivateRoute path="/dashboard" component={Dashboard} />
-          <Redirect from="/" to="/dashboard" />
-        </Switch>
-      </AppWrapper>
-    </Router>
+    <AppWrapper>
+      <Title>Solana Trading Bot</Title>
+      {isAuthenticated ? (
+        <Dashboard setIsAuthenticated={setIsAuthenticated} />
+      ) : (
+        <Auth setIsAuthenticated={setIsAuthenticated} />
+      )}
+    </AppWrapper>
   );
 }
 
