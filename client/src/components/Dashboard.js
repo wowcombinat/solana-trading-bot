@@ -3,6 +3,8 @@ import axios from 'axios';
 import styled from 'styled-components';
 import WalletManager from './WalletManager';
 import TradingInterface from './TradingInterface';
+import WalletCreator from './WalletCreator';
+import AssetDisplay from './AssetDisplay';
 
 const DashboardWrapper = styled.div`
   display: grid;
@@ -17,8 +19,9 @@ const Card = styled.div`
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 `;
 
-const Dashboard = () => {
+const Dashboard = ({ username }) => {
   const [wallets, setWallets] = useState([]);
+  const [assets, setAssets] = useState({});
 
   useEffect(() => {
     fetchWallets();
@@ -28,9 +31,23 @@ const Dashboard = () => {
     try {
       const response = await axios.get('/api/wallets');
       setWallets(response.data);
+      fetchAssets(response.data);
     } catch (error) {
       console.error('Error fetching wallets:', error);
     }
+  };
+
+  const fetchAssets = async (walletsList) => {
+    const assetsData = {};
+    for (const wallet of walletsList) {
+      try {
+        const response = await axios.get(`/api/balance/${wallet.public_key}`);
+        assetsData[wallet.public_key] = response.data.balance;
+      } catch (error) {
+        console.error(`Error fetching balance for ${wallet.public_key}:`, error);
+      }
+    }
+    setAssets(assetsData);
   };
 
   return (
@@ -40,6 +57,12 @@ const Dashboard = () => {
       </Card>
       <Card>
         <TradingInterface wallets={wallets} />
+      </Card>
+      <Card>
+        <WalletCreator onWalletCreated={fetchWallets} />
+      </Card>
+      <Card>
+        <AssetDisplay wallets={wallets} assets={assets} />
       </Card>
     </DashboardWrapper>
   );
