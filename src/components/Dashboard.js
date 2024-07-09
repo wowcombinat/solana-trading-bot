@@ -7,7 +7,16 @@ const DashboardWrapper = styled.div`
   margin-top: 20px;
 `;
 
-function Dashboard() {
+const Button = styled.button`
+  padding: 10px;
+  background-color: #ff4444;
+  color: white;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 10px;
+`;
+
+function Dashboard({ setIsAuthenticated }) {
   const [wallets, setWallets] = useState([]);
 
   useEffect(() => {
@@ -26,8 +35,14 @@ function Dashboard() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setIsAuthenticated(false);
+  };
+
   return (
     <DashboardWrapper>
+      <Button onClick={handleLogout}>Logout</Button>
       <h2>Dashboard</h2>
       <WalletManager wallets={wallets} onWalletAdded={fetchWallets} />
     </DashboardWrapper>
