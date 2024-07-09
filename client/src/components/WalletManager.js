@@ -2,24 +2,42 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
 
+const WalletManagerWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+`;
+
+const Title = styled.h2`
+  color: ${props => props.theme.primary};
+`;
+
 const Form = styled.form`
   display: flex;
   flex-direction: column;
-  max-width: 300px;
-  margin: 20px 0;
+  gap: 10px;
 `;
 
 const Input = styled.input`
-  margin-bottom: 10px;
-  padding: 5px;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid ${props => props.theme.borderColor};
+  background-color: ${props => props.theme.background};
+  color: ${props => props.theme.text};
 `;
 
 const Button = styled.button`
-  padding: 10px;
-  background-color: #00ffff;
-  color: black;
+  background-color: ${props => props.theme.secondary};
+  color: white;
   border: none;
+  padding: 10px;
+  border-radius: 5px;
   cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: ${props => props.theme.primary};
+  }
 `;
 
 const WalletList = styled.ul`
@@ -28,14 +46,17 @@ const WalletList = styled.ul`
 `;
 
 const WalletItem = styled.li`
-  margin-bottom: 10px;
+  background-color: ${props => props.theme.cardBackground};
   padding: 10px;
-  background-color: #f0f0f0;
   border-radius: 5px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 `;
 
 const ErrorMessage = styled.p`
-  color: red;
+  color: ${props => props.theme.accent};
 `;
 
 function WalletManager({ wallets, onWalletAdded }) {
@@ -47,20 +68,19 @@ function WalletManager({ wallets, onWalletAdded }) {
     e.preventDefault();
     setError('');
     try {
-      const response = await axios.post('/api/add-wallet', { privateKey, accountName });
-      console.log('Wallet added:', response.data);
+      await axios.post('/api/add-wallet', { privateKey, accountName });
       setPrivateKey('');
       setAccountName('');
       onWalletAdded();
     } catch (error) {
-      console.error('Error adding wallet:', error.response?.data?.error || error.message);
+      console.error('Error adding wallet:', error);
       setError(error.response?.data?.error || 'Failed to add wallet');
     }
   };
 
   return (
-    <div>
-      <h3>Add Wallet</h3>
+    <WalletManagerWrapper>
+      <Title>Wallet Manager</Title>
       <Form onSubmit={handleSubmit}>
         <Input
           type="text"
@@ -78,15 +98,15 @@ function WalletManager({ wallets, onWalletAdded }) {
       </Form>
       {error && <ErrorMessage>{error}</ErrorMessage>}
 
-      <h3>Your Wallets</h3>
       <WalletList>
         {wallets.map((wallet) => (
           <WalletItem key={wallet.public_key}>
-            {wallet.account_name} - {wallet.public_key}
+            <span>{wallet.account_name}</span>
+            <span>{wallet.public_key.slice(0, 10)}...</span>
           </WalletItem>
         ))}
       </WalletList>
-    </div>
+    </WalletManagerWrapper>
   );
 }
 
