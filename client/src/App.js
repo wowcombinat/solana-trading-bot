@@ -1,47 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
-import axios from 'axios';
+import styled, { ThemeProvider } from 'styled-components';
+import { lightTheme, darkTheme, GlobalStyles } from './themes';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
+import Header from './components/Header';
 
 const AppWrapper = styled.div`
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
-`;
-
-const Title = styled.h1`
-  text-align: center;
-  color: #00ffff;
-  text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff, 0 0 40px #00ffff;
+  min-height: 100vh;
+  background-color: ${props => props.theme.background};
+  color: ${props => props.theme.text};
 `;
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [theme, setTheme] = useState('light');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setIsAuthenticated(true);
     }
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
-    setIsAuthenticated(false);
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
   return (
-    <AppWrapper>
-      <Title>Solana Trading Bot</Title>
-      {isAuthenticated ? (
-        <Dashboard handleLogout={handleLogout} />
-      ) : (
-        <Auth setIsAuthenticated={setIsAuthenticated} />
-      )}
-    </AppWrapper>
+    <ThemeProvider theme={theme === 'light' ? lightTheme : darkTheme}>
+      <GlobalStyles />
+      <AppWrapper>
+        <Header 
+          isAuthenticated={isAuthenticated} 
+          setIsAuthenticated={setIsAuthenticated}
+          toggleTheme={toggleTheme}
+          theme={theme}
+        />
+        {isAuthenticated ? (
+          <Dashboard />
+        ) : (
+          <Auth setIsAuthenticated={setIsAuthenticated} />
+        )}
+      </AppWrapper>
+    </ThemeProvider>
   );
 }
 
