@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Solana Trading Bot",
   "main": "src/index.js",
+  "type": "module",
   "scripts": {
     "start": "node src/index.js",
     "heroku-prebuild": "npm install --force",
