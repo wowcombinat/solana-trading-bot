@@ -102,6 +102,41 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.get('/api/user', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT username FROM users WHERE username = $1', [req.user.username]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching user info:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/api/user', authenticateToken, async (req, res) => {
+  try {
+    // Сначала удаляем все кошельки пользователя
+    await pool.query('DELETE FROM wallets WHERE username = $1', [req.user.username]);
+    
+    // Затем удаляем самого пользователя
+    const result = await pool.query('DELETE FROM users WHERE username = $1', [req.user.username]);
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    console.log('User deleted successfully:', req.user.username);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.get('/api/wallets', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM wallets WHERE username = $1', [req.user.username]);
