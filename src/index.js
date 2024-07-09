@@ -1,4 +1,4 @@
-const express = require('express');
+]const express = require('express');
 const path = require('path');
 const { Connection, PublicKey, Keypair } = require('@solana/web3.js');
 const { Pool } = require('pg');
@@ -26,10 +26,16 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (token == null) return res.sendStatus(401);
+  if (token == null) {
+    console.log('No token provided');
+    return res.sendStatus(401);
+  }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
+    if (err) {
+      console.log('Token verification failed:', err.message);
+      return res.sendStatus(403);
+    }
     req.user = user;
     next();
   });
@@ -79,6 +85,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.get('/api/wallets', authenticateToken, async (req, res) => {
+  console.log('Fetching wallets for user:', req.user.username);
   try {
     const result = await pool.query('SELECT * FROM wallets WHERE username = $1', [req.user.username]);
     res.json(result.rows);
@@ -89,6 +96,7 @@ app.get('/api/wallets', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/add-wallet', authenticateToken, async (req, res) => {
+  console.log('Adding wallet for user:', req.user.username);
   const { privateKey, accountName, isMaster } = req.body;
   
   if (!privateKey) {
