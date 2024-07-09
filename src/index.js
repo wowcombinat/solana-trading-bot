@@ -1,4 +1,4 @@
-]const express = require('express');
+const express = require('express');
 const path = require('path');
 const { Connection, PublicKey, Keypair } = require('@solana/web3.js');
 const { Pool } = require('pg');
