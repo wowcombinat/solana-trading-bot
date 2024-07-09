@@ -7,6 +7,12 @@ const jwt = require('jsonwebtoken');
 const bs58 = require('bs58');
 require('dotenv').config();
 
+// Проверка наличия JWT_SECRET
+if (!process.env.JWT_SECRET) {
+  console.error('JWT_SECRET is not set. Please set this environment variable.');
+  process.exit(1);
+}
+
 const app = express();
 const port = process.env.PORT || 3000;
 
