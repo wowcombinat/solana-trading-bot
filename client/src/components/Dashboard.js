@@ -22,6 +22,7 @@ const Card = styled.div`
 const Dashboard = ({ username }) => {
   const [wallets, setWallets] = useState([]);
   const [assets, setAssets] = useState({});
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchWallets();
@@ -34,6 +35,7 @@ const Dashboard = ({ username }) => {
       fetchAssets(response.data);
     } catch (error) {
       console.error('Error fetching wallets:', error);
+      setError('Failed to fetch wallets');
     }
   };
 
@@ -45,10 +47,15 @@ const Dashboard = ({ username }) => {
         assetsData[wallet.public_key] = response.data;
       } catch (error) {
         console.error(`Error fetching balance for ${wallet.public_key}:`, error);
+        assetsData[wallet.public_key] = { error: 'Failed to fetch balance' };
       }
     }
     setAssets(assetsData);
   };
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
 
   return (
     <DashboardWrapper>
