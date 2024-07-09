@@ -43,12 +43,16 @@ const SwapInterface = ({ wallets }) => {
   const [toToken, setToToken] = useState('');
   const [amount, setAmount] = useState('');
   const [selectedWallet, setSelectedWallet] = useState('');
+  const [customFromToken, setCustomFromToken] = useState('');
+  const [customToToken, setCustomToToken] = useState('');
 
   const handleSwap = async () => {
     try {
+      const fromTokenAddress = fromToken === 'SOL' ? SOL_ADDRESS : customFromToken;
+      const toTokenAddress = toToken === 'SOL' ? SOL_ADDRESS : customToToken;
       const response = await axios.post('/api/swap', {
-        fromToken: fromToken === 'SOL' ? SOL_ADDRESS : fromToken,
-        toToken: toToken === 'SOL' ? SOL_ADDRESS : toToken,
+        fromToken: fromTokenAddress,
+        toToken: toTokenAddress,
         amount: parseFloat(amount),
         walletPublicKey: selectedWallet
       });
@@ -79,8 +83,8 @@ const SwapInterface = ({ wallets }) => {
         <Input
           type="text"
           placeholder="From Token Address"
-          value={fromToken}
-          onChange={(e) => setFromToken(e.target.value)}
+          value={customFromToken}
+          onChange={(e) => setCustomFromToken(e.target.value)}
         />
       )}
       <Select value={toToken} onChange={(e) => setToToken(e.target.value)}>
@@ -91,8 +95,8 @@ const SwapInterface = ({ wallets }) => {
         <Input
           type="text"
           placeholder="To Token Address"
-          value={toToken}
-          onChange={(e) => setToToken(e.target.value)}
+          value={customToToken}
+          onChange={(e) => setCustomToToken(e.target.value)}
         />
       )}
       <Input
