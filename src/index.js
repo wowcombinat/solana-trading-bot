@@ -5,6 +5,7 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const bs58 = require('bs58');
+const bip39 = require('bip39');
 require('dotenv').config();
 
 const app = express();
@@ -54,7 +55,7 @@ app.post('/api/register', async (req, res) => {
     await pool.query('INSERT INTO users (username, password) VALUES ($1, $2)', [username, hashedPassword]);
 
     const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token });
+    res.json({ token, username });
   } catch (error) {
     console.error('Error registering user:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -77,7 +78,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token });
+    res.json({ token, username });
   } catch (error) {
     console.error('Error logging in:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -123,6 +124,60 @@ app.post('/api/add-wallet', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error adding wallet:', error);
     res.status(400).json({ error: error.message || 'Invalid private key' });
+  }
+});
+
+app.get('/api/balance/:address', authenticateToken, async (req, res) => {
+  try {
+    const publicKey = new PublicKey(req.params.address);
+    const balance = await connection.getBalance(publicKey);
+    res.json({ balance: balance / 1e9 }); // Convert lamports to SOL
+  } catch (error) {
+    console.error('Error fetching balance:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/create-wallet', authenticateToken, (req, res) => {
+  try {
+    const mnemonic = bip39.generateMnemonic();
+    const seed = bip39.mnemonicToSeedSync(mnemonic);
+    const keypair = Keypair.fromSeed(seed.slice(0, 32));
+
+    res.json({
+      publicKey: keypair.publicKey.toString(),
+      privateKey: bs58.encode(keypair.secretKey),
+      mnemonic: mnemonic
+    });
+  } catch (error) {
+    console.error('Error creating wallet:', error);
+    res.status(500).json({ error: 'Failed to create wallet' });
+  }
+});
+
+app.post('/api/execute-trade', authenticateToken, async (req, res) => {
+  const { masterWalletId, amount } = req.body;
+
+  try {
+    // Здесь должна быть логика выполнения торговой операции
+    // Например, отправка транзакции в сеть Solana
+
+    // Получаем все follower-кошельки
+    const followerWallets = await pool.query(
+      'SELECT * FROM wallets WHERE username = $1 AND is_master = false',
+      [req.user.username]
+    );
+
+    // Выполняем ту же операцию для каждого follower-кошелька
+    for (const wallet of followerWallets.rows) {
+      // Здесь должна быть логика выполнения той же операции для follower-кошелька
+      console.log(`Executing trade for follower wallet: ${wallet.public_key}`);
+    }
+
+    res.json({ message: 'Trade executed successfully' });
+  } catch (error) {
+    console.error('Error executing trade:', error);
+    res.status(500).json({ error: 'Failed to execute trade' });
   }
 });
 
