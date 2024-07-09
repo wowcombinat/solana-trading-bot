@@ -47,12 +47,13 @@ function WalletManager({ wallets, onWalletAdded }) {
     e.preventDefault();
     setError('');
     try {
-      await axios.post('/api/add-wallet', { privateKey, accountName });
+      const response = await axios.post('/api/add-wallet', { privateKey, accountName });
+      console.log('Wallet added:', response.data);
       setPrivateKey('');
       setAccountName('');
       onWalletAdded();
     } catch (error) {
-      console.error('Error adding wallet:', error);
+      console.error('Error adding wallet:', error.response?.data?.error || error.message);
       setError(error.response?.data?.error || 'Failed to add wallet');
     }
   };
