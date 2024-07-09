@@ -2,21 +2,22 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
 import WalletManager from './WalletManager';
+import TradingInterface from './TradingInterface';
 
 const DashboardWrapper = styled.div`
-  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
 `;
 
-const Button = styled.button`
-  padding: 10px;
-  background-color: #ff4444;
-  color: white;
-  border: none;
-  cursor: pointer;
-  margin-bottom: 10px;
+const Card = styled.div`
+  background-color: ${props => props.theme.cardBackground};
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 `;
 
-function Dashboard({ handleLogout }) {
+const Dashboard = () => {
   const [wallets, setWallets] = useState([]);
 
   useEffect(() => {
@@ -28,20 +29,20 @@ function Dashboard({ handleLogout }) {
       const response = await axios.get('/api/wallets');
       setWallets(response.data);
     } catch (error) {
-      console.error('Error fetching wallets:', error.response?.data?.error || error.message);
-      if (error.response && error.response.status === 403) {
-        handleLogout();
-      }
+      console.error('Error fetching wallets:', error);
     }
   };
 
   return (
     <DashboardWrapper>
-      <Button onClick={handleLogout}>Logout</Button>
-      <h2>Dashboard</h2>
-      <WalletManager wallets={wallets} onWalletAdded={fetchWallets} />
+      <Card>
+        <WalletManager wallets={wallets} onWalletAdded={fetchWallets} />
+      </Card>
+      <Card>
+        <TradingInterface wallets={wallets} />
+      </Card>
     </DashboardWrapper>
   );
-}
+};
 
 export default Dashboard;
