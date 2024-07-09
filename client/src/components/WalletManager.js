@@ -1,4 +1,3 @@
-// client/src/components/WalletManager.js
 import React, { useState } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
@@ -77,19 +76,6 @@ function WalletManager({ wallets, onWalletAdded, onWalletDeleted }) {
     }
   };
 
-  const handleCreateWallet = async () => {
-    try {
-      const response = await axios.post('/api/create-wallet', { accountName, isMaster });
-      console.log('Wallet created:', response.data);
-      setAccountName('');
-      setIsMaster(false);
-      onWalletAdded();
-    } catch (error) {
-      console.error('Error creating wallet:', error);
-      setError(error.response?.data?.error || 'Failed to create wallet');
-    }
-  };
-
   const handleDelete = async (publicKey) => {
     try {
       await axios.delete(`/api/delete-wallet/${publicKey}`);
@@ -126,7 +112,6 @@ function WalletManager({ wallets, onWalletAdded, onWalletDeleted }) {
         </label>
         <Button type="submit">Add Wallet</Button>
       </Form>
-      <Button onClick={handleCreateWallet}>Create New Wallet</Button>
       {error && <ErrorMessage>{error}</ErrorMessage>}
 
       <h3>Your Wallets</h3>
@@ -145,3 +130,4 @@ function WalletManager({ wallets, onWalletAdded, onWalletDeleted }) {
 }
 
 export default WalletManager;
+
