@@ -92,6 +92,10 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.get('/api/user', authenticateToken, (req, res) => {
+  res.json({ username: req.user.username });
+});
+
 app.get('/api/wallets', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM wallets WHERE username = $1', [req.user.username]);
@@ -128,6 +132,26 @@ app.post('/api/add-wallet', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error adding wallet:', error);
     res.status(400).json({ error: error.message || 'Invalid private key' });
+  }
+});
+
+app.post('/api/create-wallet', authenticateToken, async (req, res) => {
+  const { accountName, isMaster } = req.body;
+  
+  try {
+    const keypair = Keypair.generate();
+    const publicKey = keypair.publicKey.toString();
+    const privateKey = bs58.encode(keypair.secretKey);
+
+    await pool.query(
+      'INSERT INTO wallets (username, public_key, private_key, account_name, is_master) VALUES ($1, $2, $3, $4, $5)',
+      [req.user.username, publicKey, privateKey, accountName, isMaster]
+    );
+
+    res.json({ message: 'Wallet created successfully', publicKey, privateKey });
+  } catch (error) {
+    console.error('Error creating wallet:', error);
+    res.status(500).json({ error: 'Failed to create wallet' });
   }
 });
 
