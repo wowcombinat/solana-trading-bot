@@ -1,3 +1,4 @@
+// client/src/components/Dashboard.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
@@ -5,6 +6,7 @@ import WalletManager from './WalletManager';
 import SwapInterface from './SwapInterface';
 import BumpInterface from './BumpInterface';
 import AssetDisplay from './AssetDisplay';
+import CreateWallet from './CreateWallet';
 
 const DashboardWrapper = styled.div`
   display: grid;
@@ -65,6 +67,9 @@ const Dashboard = ({ username }) => {
       </Card>
       <Card>
         <AssetDisplay wallets={wallets} assets={assets} />
+      </Card>
+      <Card>
+        <CreateWallet onWalletCreated={fetchWallets} />
       </Card>
       <Card>
         <SwapInterface wallets={wallets} />
