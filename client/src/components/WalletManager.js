@@ -1,6 +1,8 @@
+// client/src/components/WalletManager.js
 import React, { useState } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
+import WalletDetails from './WalletDetails';
 
 const WalletManagerWrapper = styled.div`
   display: flex;
@@ -56,19 +58,35 @@ const ErrorMessage = styled.p`
 function WalletManager({ wallets, onWalletAdded, onWalletDeleted }) {
   const [privateKey, setPrivateKey] = useState('');
   const [accountName, setAccountName] = useState('');
+  const [isMaster, setIsMaster] = useState(false);
   const [error, setError] = useState('');
+  const [selectedWallet, setSelectedWallet] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      await axios.post('/api/add-wallet', { privateKey, accountName });
+      await axios.post('/api/add-wallet', { privateKey, accountName, isMaster });
       setPrivateKey('');
       setAccountName('');
+      setIsMaster(false);
       onWalletAdded();
     } catch (error) {
       console.error('Error adding wallet:', error);
       setError(error.response?.data?.error || 'Failed to add wallet');
+    }
+  };
+
+  const handleCreateWallet = async () => {
+    try {
+      const response = await axios.post('/api/create-wallet', { accountName, isMaster });
+      console.log('Wallet created:', response.data);
+      setAccountName('');
+      setIsMaster(false);
+      onWalletAdded();
+    } catch (error) {
+      console.error('Error creating wallet:', error);
+      setError(error.response?.data?.error || 'Failed to create wallet');
     }
   };
 
@@ -98,19 +116,30 @@ function WalletManager({ wallets, onWalletAdded, onWalletDeleted }) {
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
         />
+        <label>
+          <input
+            type="checkbox"
+            checked={isMaster}
+            onChange={(e) => setIsMaster(e.target.checked)}
+          />
+          Master Wallet
+        </label>
         <Button type="submit">Add Wallet</Button>
       </Form>
+      <Button onClick={handleCreateWallet}>Create New Wallet</Button>
       {error && <ErrorMessage>{error}</ErrorMessage>}
 
       <h3>Your Wallets</h3>
       <WalletList>
         {wallets.map((wallet) => (
           <WalletItem key={wallet.public_key}>
-            <span>{wallet.account_name} - {wallet.public_key.slice(0, 10)}...</span>
+            <span>{wallet.account_name} - {wallet.public_key}</span>
+            <Button onClick={() => setSelectedWallet(wallet.public_key)}>View Details</Button>
             <Button onClick={() => handleDelete(wallet.public_key)}>Delete</Button>
           </WalletItem>
         ))}
       </WalletList>
+      {selectedWallet && <WalletDetails publicKey={selectedWallet} />}
     </WalletManagerWrapper>
   );
 }
