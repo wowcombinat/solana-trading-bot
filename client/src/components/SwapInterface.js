@@ -82,3 +82,13 @@ const SwapInterface = ({ wallets }) => {
       />
       <Input
         type="number"
+        placeholder="Amount"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+      />
+      <Button onClick={handleSwap}>Swap</Button>
+    </SwapWrapper>
+  );
+};
+
+export default SwapInterface;
