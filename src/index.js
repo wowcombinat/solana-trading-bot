@@ -139,6 +139,10 @@ app.post('/api/add-wallet', authenticateToken, async (req, res) => {
 
 app.post('/api/create-wallet', authenticateToken, async (req, res) => {
   const { accountName, isMaster, password } = req.body;
+
+  if (!password || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Password is required and must be a string' });
+  }
   
   try {
     const mnemonic = bip39.generateMnemonic();
@@ -174,6 +178,10 @@ app.post('/api/create-wallet', authenticateToken, async (req, res) => {
 
 app.post('/api/get-wallet-details', authenticateToken, async (req, res) => {
   const { publicKey, password } = req.body;
+
+  if (!password || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Password is required and must be a string' });
+  }
 
   try {
     const result = await pool.query('SELECT private_key, mnemonic FROM wallets WHERE public_key = $1 AND username = $2', [publicKey, req.user.username]);
@@ -327,6 +335,10 @@ app.post('/api/bump', authenticateToken, async (req, res) => {
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/build/index.html'));
+});
+
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
 
 app.listen(port, () => {
