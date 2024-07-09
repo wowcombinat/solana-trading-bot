@@ -1,88 +1,79 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
+import WalletManager from './WalletManager';
+import SwapInterface from './SwapInterface';
+import BumpInterface from './BumpInterface';
+import AssetDisplay from './AssetDisplay';
 
-const Form = styled.form`
-  display: flex;
-  flex-direction: column;
-  max-width: 300px;
-  margin: 20px 0;
+const DashboardWrapper = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
 `;
 
-const Input = styled.input`
-  margin-bottom: 10px;
-  padding: 5px;
+const Card = styled.div`
+  background-color: ${props => props.theme.cardBackground};
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 `;
 
-const Button = styled.button`
-  padding: 10px;
-  background-color: #00ffff;
-  color: black;
-  border: none;
-  cursor: pointer;
-`;
+const Dashboard = ({ username }) => {
+  const [wallets, setWallets] = useState([]);
+  const [assets, setAssets] = useState({});
+  const [error, setError] = useState(null);
 
-const WalletList = styled.ul`
-  list-style-type: none;
-  padding: 0;
-`;
+  useEffect(() => {
+    fetchWallets();
+  }, []);
 
-const WalletItem = styled.li`
-  margin-bottom: 10px;
-  padding: 10px;
-  background-color: #f0f0f0;
-  border-radius: 5px;
-`;
-
-function WalletManager({ wallets, onWalletAdded }) {
-  const [privateKey, setPrivateKey] = useState('');
-  const [accountName, setAccountName] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const fetchWallets = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/api/add-wallet', 
-        { privateKey, accountName },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setPrivateKey('');
-      setAccountName('');
-      onWalletAdded();
+      const response = await axios.get('/api/wallets');
+      setWallets(response.data);
+      fetchAssets(response.data);
     } catch (error) {
-      console.error('Error adding wallet:', error);
+      console.error('Error fetching wallets:', error);
+      setError('Failed to fetch wallets');
     }
   };
 
+  const fetchAssets = async (walletsList) => {
+    const assetsData = {};
+    for (const wallet of walletsList) {
+      try {
+        const response = await axios.get(`/api/balance/${wallet.public_key}`);
+        assetsData[wallet.public_key] = response.data;
+      } catch (error) {
+        console.error(`Error fetching balance for ${wallet.public_key}:`, error);
+        assetsData[wallet.public_key] = { error: 'Failed to fetch balance' };
+      }
+    }
+    setAssets(assetsData);
+  };
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
+
   return (
-    <div>
-      <h3>Add Wallet</h3>
-      <Form onSubmit={handleSubmit}>
-        <Input
-          type="text"
-          placeholder="Private Key"
-          value={privateKey}
-          onChange={(e) => setPrivateKey(e.target.value)}
-        />
-        <Input
-          type="text"
-          placeholder="Account Name"
-          value={accountName}
-          onChange={(e) => setAccountName(e.target.value)}
-        />
-        <Button type="submit">Add Wallet</Button>
-      </Form>
-
-      <h3>Your Wallets</h3>
-      <WalletList>
-        {wallets.map((wallet) => (
-          <WalletItem key={wallet.public_key}>
-            {wallet.account_name} - {wallet.public_key}
-          </WalletItem>
-        ))}
-      </WalletList>
-    </div>
+    <DashboardWrapper>
+      <Card>
+        <h2>Welcome, {username}!</h2>
+        <WalletManager wallets={wallets} onWalletAdded={fetchWallets} onWalletDeleted={fetchWallets} />
+      </Card>
+      <Card>
+        <AssetDisplay wallets={wallets} assets={assets} />
+      </Card>
+      <Card>
+        <SwapInterface wallets={wallets} />
+      </Card>
+      <Card>
+        <BumpInterface wallets={wallets} />
+      </Card>
+    </DashboardWrapper>
   );
-}
+};
 
-export default WalletManager;
+export default Dashboard;
