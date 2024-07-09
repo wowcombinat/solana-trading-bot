@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
 import WalletManager from './WalletManager';
-import TradingInterface from './TradingInterface';
-import WalletCreator from './WalletCreator';
+import SwapInterface from './SwapInterface';
+import BumpInterface from './BumpInterface';
 import AssetDisplay from './AssetDisplay';
 
 const DashboardWrapper = styled.div`
@@ -42,7 +42,7 @@ const Dashboard = ({ username }) => {
     for (const wallet of walletsList) {
       try {
         const response = await axios.get(`/api/balance/${wallet.public_key}`);
-        assetsData[wallet.public_key] = response.data.balance;
+        assetsData[wallet.public_key] = response.data;
       } catch (error) {
         console.error(`Error fetching balance for ${wallet.public_key}:`, error);
       }
@@ -53,16 +53,17 @@ const Dashboard = ({ username }) => {
   return (
     <DashboardWrapper>
       <Card>
-        <WalletManager wallets={wallets} onWalletAdded={fetchWallets} />
-      </Card>
-      <Card>
-        <TradingInterface wallets={wallets} />
-      </Card>
-      <Card>
-        <WalletCreator onWalletCreated={fetchWallets} />
+        <h2>Welcome, {username}!</h2>
+        <WalletManager wallets={wallets} onWalletAdded={fetchWallets} onWalletDeleted={fetchWallets} />
       </Card>
       <Card>
         <AssetDisplay wallets={wallets} assets={assets} />
+      </Card>
+      <Card>
+        <SwapInterface wallets={wallets} />
+      </Card>
+      <Card>
+        <BumpInterface wallets={wallets} />
       </Card>
     </DashboardWrapper>
   );
