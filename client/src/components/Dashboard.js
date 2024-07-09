@@ -16,7 +16,7 @@ const Button = styled.button`
   margin-bottom: 10px;
 `;
 
-function Dashboard({ setIsAuthenticated }) {
+function Dashboard({ handleLogout }) {
   const [wallets, setWallets] = useState([]);
 
   useEffect(() => {
@@ -29,13 +29,10 @@ function Dashboard({ setIsAuthenticated }) {
       setWallets(response.data);
     } catch (error) {
       console.error('Error fetching wallets:', error);
+      if (error.response && error.response.status === 401) {
+        handleLogout();
+      }
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
-    setIsAuthenticated(false);
   };
 
   return (
