@@ -1,19 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import styled, { createGlobalStyle } from 'styled-components';
-import WalletManager from './components/WalletManager';
-import MotivationalBanner from './components/MotivationalBanner';
+import styled from 'styled-components';
+import axios from 'axios';
 import Auth from './components/Auth';
-
-const GlobalStyle = createGlobalStyle`
-  body {
-    background-color: #000;
-    color: #00ff00;
-    font-family: 'Courier New', monospace;
-  }
-`;
+import Dashboard from './components/Dashboard';
 
 const AppWrapper = styled.div`
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
 `;
@@ -30,23 +22,20 @@ function App() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setIsAuthenticated(true);
     }
   }, []);
 
   return (
-    <>
-      <GlobalStyle />
-      <AppWrapper>
-        <Title>Solana Trading Bot</Title>
-        <MotivationalBanner />
-        {isAuthenticated ? (
-          <WalletManager />
-        ) : (
-          <Auth setIsAuthenticated={setIsAuthenticated} />
-        )}
-      </AppWrapper>
-    </>
+    <AppWrapper>
+      <Title>Solana Trading Bot</Title>
+      {isAuthenticated ? (
+        <Dashboard setIsAuthenticated={setIsAuthenticated} />
+      ) : (
+        <Auth setIsAuthenticated={setIsAuthenticated} />
+      )}
+    </AppWrapper>
   );
 }
 
