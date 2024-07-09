@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "heroku-postbuild": "cd client && npm install && npm run build"
+    "heroku-postbuild": "NPM_CONFIG_PRODUCTION=false npm install --prefix client && npm run build --prefix client"
   },
   "dependencies": {
     "express": "^4.17.1",
@@ -20,5 +20,6 @@
   },
   "engines": {
     "node": "16.x"
-  }
+  },
+  "cacheDirectories": ["client/node_modules"]
 }
