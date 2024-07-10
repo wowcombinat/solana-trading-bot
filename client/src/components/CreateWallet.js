@@ -1,4 +1,3 @@
-// src/components/CreateWallet.js
 import React, { useState } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
@@ -27,19 +26,28 @@ const CreateWallet = ({ onWalletCreated }) => {
   const [accountName, setAccountName] = useState('');
   const [isMaster, setIsMaster] = useState(false);
   const [password, setPassword] = useState('');
+  const [operationAmount, setOperationAmount] = useState('');
+  const [slippage, setSlippage] = useState('');
+  const [fee, setFee] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/api/create-wallet', 
-        { accountName, isMaster, password },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await axios.post('/api/create-wallet', {
+        accountName,
+        isMaster,
+        password,
+        operationAmount,
+        slippage,
+        fee
+      });
       console.log('Wallet created:', response.data);
       setAccountName('');
       setIsMaster(false);
       setPassword('');
+      setOperationAmount('');
+      setSlippage('');
+      setFee('');
       onWalletCreated();
     } catch (error) {
       console.error('Error creating wallet:', error);
@@ -64,6 +72,24 @@ const CreateWallet = ({ onWalletCreated }) => {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Encryption Password"
           required
+        />
+        <Input
+          type="number"
+          value={operationAmount}
+          onChange={(e) => setOperationAmount(e.target.value)}
+          placeholder="Operation Amount"
+        />
+        <Input
+          type="number"
+          value={slippage}
+          onChange={(e) => setSlippage(e.target.value)}
+          placeholder="Slippage"
+        />
+        <Input
+          type="number"
+          value={fee}
+          onChange={(e) => setFee(e.target.value)}
+          placeholder="Fee"
         />
         <label>
           <input
