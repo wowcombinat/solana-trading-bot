@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
-import WalletDetails from './WalletDetails';
 
 const WalletManagerWrapper = styled.div`
   display: flex;
@@ -57,18 +56,15 @@ const ErrorMessage = styled.p`
 function WalletManager({ wallets, onWalletAdded, onWalletDeleted }) {
   const [privateKey, setPrivateKey] = useState('');
   const [accountName, setAccountName] = useState('');
-  const [isMaster, setIsMaster] = useState(false);
   const [error, setError] = useState('');
-  const [selectedWallet, setSelectedWallet] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      await axios.post('/api/add-wallet', { privateKey, accountName, isMaster });
+      await axios.post('/api/add-wallet', { privateKey, accountName });
       setPrivateKey('');
       setAccountName('');
-      setIsMaster(false);
       onWalletAdded();
     } catch (error) {
       console.error('Error adding wallet:', error);
@@ -102,14 +98,6 @@ function WalletManager({ wallets, onWalletAdded, onWalletDeleted }) {
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
         />
-        <label>
-          <input
-            type="checkbox"
-            checked={isMaster}
-            onChange={(e) => setIsMaster(e.target.checked)}
-          />
-          Master Wallet
-        </label>
         <Button type="submit">Add Wallet</Button>
       </Form>
       {error && <ErrorMessage>{error}</ErrorMessage>}
@@ -118,16 +106,13 @@ function WalletManager({ wallets, onWalletAdded, onWalletDeleted }) {
       <WalletList>
         {wallets.map((wallet) => (
           <WalletItem key={wallet.public_key}>
-            <span>{wallet.account_name} - {wallet.public_key}</span>
-            <Button onClick={() => setSelectedWallet(wallet.public_key)}>View Details</Button>
+            <span>{wallet.account_name} - {wallet.public_key.slice(0, 10)}...</span>
             <Button onClick={() => handleDelete(wallet.public_key)}>Delete</Button>
           </WalletItem>
         ))}
       </WalletList>
-      {selectedWallet && <WalletDetails publicKey={selectedWallet} />}
     </WalletManagerWrapper>
   );
 }
 
 export default WalletManager;
-
