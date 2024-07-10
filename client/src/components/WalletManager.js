@@ -75,23 +75,32 @@ const WalletManager = ({ wallets, onWalletUpdated }) => {
 
   const handleToggleBot = async (publicKey, isActive) => {
     try {
-      await axios.post('/api/toggle-bot', { publicKey, isActive });
-      onWalletUpdated();
-    } catch (error) {
+      console.log('Toggling bot:', { publicKey, isActive });
+      const response = await axios.post('/api/toggle-bot', { publicKey, isActive });
+      console.log('Toggle bot response:', response.data);
+      if (response.status === 200) {
+        onWalletUpdated();
+      } else {
+        throw new Error('Failed to toggle bot');
+      } catch (error) {
       console.error('Error toggling bot:', error);
-      alert('Failed to toggle bot');
+      alert('Failed to toggle bot: ' + (error.response?.data?.error || error.message));
     }
   };
 
   const handleUpdateWallet = async (e) => {
     e.preventDefault();
     try {
-      await axios.put('/api/update-wallet', editingWallet);
-      setEditingWallet(null);
-      onWalletUpdated();
+      const response = await axios.put('/api/update-wallet', editingWallet);
+      if (response.status === 200) {
+        setEditingWallet(null);
+        onWalletUpdated();
+      } else {
+        throw new Error('Failed to update wallet');
+      }
     } catch (error) {
       console.error('Error updating wallet:', error);
-      alert('Failed to update wallet');
+      alert('Failed to update wallet: ' + (error.response?.data?.error || error.message));
     }
   };
 
