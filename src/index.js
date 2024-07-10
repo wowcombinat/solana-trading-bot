@@ -1,7 +1,8 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Connection, PublicKey, Keypair, Transaction } from "@solana/web3.js";
+import { Connection, PublicKey, Keypair, Transaction, SystemProgram, LAMPORTS_PER_SOL, sendAndConfirmTransaction } from "@solana/web3.js";
+import { Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import pkg from 'pg';
 const { Pool } = pkg;
 import bcrypt from 'bcrypt';
@@ -54,6 +55,14 @@ const authenticateToken = (req, res, next) => {
     req.user = user;
     next();
   });
+};
+
+const decryptPrivateKey = (encryptedPrivateKey, iv, password) => {
+  const key = crypto.scryptSync(password, 'salt', 32);
+  const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
+  let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
+  privateKey += decipher.final('utf8');
+  return privateKey;
 };
 
 app.post('/api/register', async (req, res) => {
@@ -130,6 +139,11 @@ app.post('/api/add-wallet', authenticateToken, async (req, res) => {
     const keypair = Keypair.fromSecretKey(decodedPrivateKey);
     const publicKey = keypair.publicKey.toString();
 
+    const existingWallet = await pool.query('SELECT * FROM wallets WHERE public_key = $1', [publicKey]);
+    if (existingWallet.rows.length > 0) {
+      return res.status(400).json({ error: 'Wallet with this public key already exists' });
+    }
+
     await pool.query(
       'INSERT INTO wallets (username, public_key, private_key, account_name, is_master) VALUES ($1, $2, $3, $4, $5)',
       [req.user.username, publicKey, privateKey, accountName, isMaster]
@@ -152,17 +166,20 @@ app.post('/api/create-wallet', authenticateToken, async (req, res) => {
     const publicKey = keypair.publicKey.toString();
     const privateKey = bs58.encode(keypair.secretKey);
 
-    const cipher = crypto.createCipher('aes-256-cbc', password);
+    const iv = crypto.randomBytes(16);
+    const key = crypto.scryptSync(password, 'salt', 32);
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+
     let encryptedPrivateKey = cipher.update(privateKey, 'utf8', 'hex');
     encryptedPrivateKey += cipher.final('hex');
 
-    const mnemonicCipher = crypto.createCipher('aes-256-cbc', password);
+    const mnemonicCipher = crypto.createCipheriv('aes-256-cbc', key, iv);
     let encryptedMnemonic = mnemonicCipher.update(mnemonic, 'utf8', 'hex');
     encryptedMnemonic += mnemonicCipher.final('hex');
 
     await pool.query(
-      'INSERT INTO wallets (username, public_key, private_key, mnemonic, account_name, is_master) VALUES ($1, $2, $3, $4, $5, $6)',
-      [req.user.username, publicKey, encryptedPrivateKey, encryptedMnemonic, accountName, isMaster]
+      'INSERT INTO wallets (username, public_key, private_key, mnemonic, account_name, is_master, iv) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [req.user.username, publicKey, encryptedPrivateKey, encryptedMnemonic, accountName, isMaster, iv.toString('hex')]
     );
 
     res.json({ message: 'Wallet created successfully', publicKey });
@@ -176,19 +193,20 @@ app.post('/api/get-wallet-details', authenticateToken, async (req, res) => {
   const { publicKey, password } = req.body;
 
   try {
-    const result = await pool.query('SELECT private_key, mnemonic FROM wallets WHERE public_key = $1 AND username = $2', [publicKey, req.user.username]);
+    const result = await pool.query('SELECT private_key, mnemonic, iv FROM wallets WHERE public_key = $1 AND username = $2', [publicKey, req.user.username]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Wallet not found' });
     }
 
-    const { private_key: encryptedPrivateKey, mnemonic: encryptedMnemonic } = result.rows[0];
+    const { private_key: encryptedPrivateKey, mnemonic: encryptedMnemonic, iv } = result.rows[0];
 
-    const decipher = crypto.createDecipher('aes-256-cbc', password);
+    const key = crypto.scryptSync(password, 'salt', 32);
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
     let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
     privateKey += decipher.final('utf8');
 
-    const mnemonicDecipher = crypto.createDecipher('aes-256-cbc', password);
+    const mnemonicDecipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
     let mnemonic = mnemonicDecipher.update(encryptedMnemonic, 'hex', 'utf8');
     mnemonic += mnemonicDecipher.final('utf8');
 
@@ -243,18 +261,19 @@ app.get('/api/balance/:address', authenticateToken, async (req, res) => {
 const SOL_ADDRESS = "So11111111111111111111111111111111111111112";
 
 app.post('/api/swap', authenticateToken, async (req, res) => {
-  const { fromToken, toToken, amount, walletPublicKey } = req.body;
+  const { fromToken, toToken, amount, walletPublicKey, password } = req.body;
 
   try {
-    const walletResult = await pool.query('SELECT private_key FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
+    const walletResult = await pool.query('SELECT private_key, iv FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
     
     if (walletResult.rows.length === 0) {
       return res.status(404).json({ error: 'Wallet not found' });
     }
 
-    const privateKey = walletResult.rows[0].private_key;
-    const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+    const { private_key: encryptedPrivateKey, iv } = walletResult.rows[0];
 
+    const privateKey = decryptPrivateKey(encryptedPrivateKey, iv, password);
+    const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
     const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
 
     const swapResponse = await solanaTracker.getSwapInstructions(
@@ -267,7 +286,12 @@ app.post('/api/swap', authenticateToken, async (req, res) => {
       false // Force legacy transaction for Jupiter
     );
 
-    res.json({ message: 'Swap instructions generated', instructions: swapResponse });
+    const swapSignature = await sendAndConfirmTransaction(connection, swapResponse.transaction, [keypair]);
+
+    await pool.query('INSERT INTO transactions (wallet_id, signature, type, amount) VALUES ($1, $2, $3, $4)',
+      [walletPublicKey, swapSignature, 'swap', amount]);
+
+    res.json({ message: 'Swap executed successfully', signature: swapSignature });
   } catch (error) {
     console.error('Error during swap:', error);
     res.status(500).json({ error: 'Failed to perform swap' });
@@ -275,18 +299,19 @@ app.post('/api/swap', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/bump', authenticateToken, async (req, res) => {
-  const { walletPublicKey, tokenAddress, bumpAmount } = req.body;
+  const { walletPublicKey, tokenAddress, bumpAmount, password } = req.body;
 
   try {
-    const walletResult = await pool.query('SELECT private_key FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
+    const walletResult = await pool.query('SELECT private_key, iv FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
     
     if (walletResult.rows.length === 0) {
       return res.status(404).json({ error: 'Wallet not found' });
     }
 
-    const privateKey = walletResult.rows[0].private_key;
-    const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+    const { private_key: encryptedPrivateKey, iv } = walletResult.rows[0];
 
+    const privateKey = decryptPrivateKey(encryptedPrivateKey, iv, password);
+    const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
     const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
 
     const buyResponse = await solanaTracker.getSwapInstructions(
@@ -299,6 +324,11 @@ app.post('/api/bump', authenticateToken, async (req, res) => {
       false // Force legacy transaction for Jupiter
     );
 
+    const buySignature = await sendAndConfirmTransaction(connection, buyResponse.transaction, [keypair]);
+
+    await pool.query('INSERT INTO transactions (wallet_id, signature, type, amount) VALUES ($1, $2, $3, $4)',
+      [walletPublicKey, buySignature, 'bump_buy', bumpAmount]);
+
     const sellResponse = await solanaTracker.getSwapInstructions(
       tokenAddress,
       SOL_ADDRESS,
@@ -309,10 +339,80 @@ app.post('/api/bump', authenticateToken, async (req, res) => {
       false // Force legacy transaction for Jupiter
     );
 
-    res.json({ message: 'Bump instructions generated', buyInstructions: buyResponse, sellInstructions: sellResponse });
+    const sellSignature = await sendAndConfirmTransaction(connection, sellResponse.transaction, [keypair]);
+
+    await pool.query('INSERT INTO transactions (wallet_id, signature, type, amount) VALUES ($1, $2, $3, $4)',
+      [walletPublicKey, sellSignature, 'bump_sell', bumpAmount]);
+
+    res.json({ message: 'Bump executed successfully', buySignature, sellSignature });
   } catch (error) {
     console.error('Error during bump:', error);
     res.status(500).json({ error: 'Failed to perform bump' });
+  }
+});
+
+app.post('/api/set-master-wallet', authenticateToken, async (req, res) => {
+  const { publicKey } = req.body;
+
+  try {
+    await pool.query('UPDATE wallets SET is_master = false WHERE username = $1', [req.user.username]);
+    await pool.query('UPDATE wallets SET is_master = true WHERE public_key = $1 AND username = $2', [publicKey, req.user.username]);
+    res.json({ message: 'Master wallet set successfully' });
+  } catch (error) {
+    console.error('Error setting master wallet:', error);
+    res.status(500).json({ error: 'Failed to set master wallet' });
+  }
+});
+
+app.post('/api/copy-trade', authenticateToken, async (req, res) => {
+  const { masterPublicKey, amount, destinationAddress, password } = req.body;
+
+  try {
+    const masterWallet = await pool.query('SELECT * FROM wallets WHERE public_key = $1 AND is_master = true AND username = $2', [masterPublicKey, req.user.username]);
+    if (masterWallet.rows.length === 0) {
+      return res.status(400).json({ error: 'Master wallet not found' });
+    }
+
+    const followerWallets = await pool.query('SELECT * FROM wallets WHERE is_master = false AND username = $1', [req.user.username]);
+
+    const masterPrivateKey = decryptPrivateKey(masterWallet.rows[0].private_key, masterWallet.rows[0].iv, password);
+    const masterKeypair = Keypair.fromSecretKey(bs58.decode(masterPrivateKey));
+    
+    const transaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: masterKeypair.publicKey,
+        toPubkey: new PublicKey(destinationAddress),
+        lamports: amount * LAMPORTS_PER_SOL
+      })
+    );
+    
+    const signature = await sendAndConfirmTransaction(connection, transaction, [masterKeypair]);
+    
+    await pool.query('INSERT INTO transactions (wallet_id, signature, type, amount) VALUES ($1, $2, $3, $4)',
+      [masterPublicKey, signature, 'copy_trade_master', amount]);
+
+    for (const follower of followerWallets.rows) {
+      const followerPrivateKey = decryptPrivateKey(follower.private_key, follower.iv, password);
+      const followerKeypair = Keypair.fromSecretKey(bs58.decode(followerPrivateKey));
+      
+      const followerTransaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: followerKeypair.publicKey,
+          toPubkey: new PublicKey(destinationAddress),
+          lamports: amount * LAMPORTS_PER_SOL
+        })
+      );
+      
+      const followerSignature = await sendAndConfirmTransaction(connection, followerTransaction, [followerKeypair]);
+      
+      await pool.query('INSERT INTO transactions (wallet_id, signature, type, amount) VALUES ($1, $2, $3, $4)',
+        [follower.public_key, followerSignature, 'copy_trade_follower', amount]);
+    }
+
+    res.json({ message: 'Copy trade executed successfully' });
+  } catch (error) {
+    console.error('Error executing copy trade:', error);
+    res.status(500).json({ error: 'Failed to execute copy trade' });
   }
 });
 
