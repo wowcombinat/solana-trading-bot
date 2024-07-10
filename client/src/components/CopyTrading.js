@@ -47,4 +47,3 @@ const CopyTrading = () => {
 };
 
 export default CopyTrading;
-
