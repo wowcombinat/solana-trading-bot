@@ -1,4 +1,3 @@
-// src/themes.js
 import { createGlobalStyle } from 'styled-components';
 
 export const lightTheme = {
@@ -9,6 +8,10 @@ export const lightTheme = {
   accent: '#e74c3c',
   cardBackground: '#ffffff',
   borderColor: '#e0e0e0',
+  tableHeader: '#f1f1f1',
+  inputBackground: '#ffffff',
+  error: '#e74c3c',
+  errorHover: '#c0392b',
 };
 
 export const darkTheme = {
@@ -19,6 +22,10 @@ export const darkTheme = {
   accent: '#e74c3c',
   cardBackground: '#34495e',
   borderColor: '#7f8c8d',
+  tableHeader: '#2c3e50',
+  inputBackground: '#34495e',
+  error: '#e74c3c',
+  errorHover: '#c0392b',
 };
 
 export const GlobalStyles = createGlobalStyle`
