@@ -1,3 +1,4 @@
+// src/components/Header.js
 import React from 'react';
 import styled from 'styled-components';
 
@@ -40,13 +41,7 @@ const Username = styled.span`
   font-weight: bold;
 `;
 
-const Header = ({ isAuthenticated, setIsAuthenticated, toggleTheme, theme, username }) => {
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    setIsAuthenticated(false);
-  };
-
+const Header = ({ isAuthenticated, handleLogout, toggleTheme, theme, username }) => {
   return (
     <HeaderWrapper>
       <Logo>SolanaTrader</Logo>
