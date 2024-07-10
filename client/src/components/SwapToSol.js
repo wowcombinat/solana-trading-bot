@@ -1,33 +1,50 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import styled from 'styled-components';
-
-const Button = styled.button`
-  padding: 10px 20px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  cursor: pointer;
-  margin: 20px 0;
-`;
 
 const SwapToSol = () => {
-  const handleSwapAll = async () => {
-    try {
-      await axios.post('/api/swap-all-to-sol');
-      alert('All assets swapped to SOL successfully');
-    } catch (error) {
-      console.error('Error swapping to SOL:', error);
-      alert('Failed to swap assets to SOL: ' + error.response?.data?.error || error.message);
-    }
-  };
+    const [wallets, setWallets] = useState([]);
+    const [selectedWallet, setSelectedWallet] = useState('');
+    const [message, setMessage] = useState('');
 
-  return (
-    <div>
-      <h3>Swap All Assets to SOL</h3>
-      <Button onClick={handleSwapAll}>Swap All to SOL</Button>
-    </div>
-  );
+    useEffect(() => {
+        const fetchWallets = async () => {
+            try {
+                const response = await axios.get('/api/wallets');
+                setWallets(response.data);
+            } catch (error) {
+                console.error('Error fetching wallets', error);
+            }
+        };
+
+        fetchWallets();
+    }, []);
+
+    const handleSwapToSol = async () => {
+        try {
+            const response = await axios.post('/api/swapalltosol', { walletPublicKey: selectedWallet });
+            setMessage('All assets swapped to SOL successfully!');
+        } catch (error) {
+            setMessage('Error swapping all assets to SOL');
+            console.error(error);
+        }
+    };
+
+    return (
+        <div>
+            <h2>Swap All Assets to SOL</h2>
+            <select onChange={(e) => setSelectedWallet(e.target.value)}>
+                <option value="">Select Wallet</option>
+                {wallets.map(wallet => (
+                    <option key={wallet.public_key} value={wallet.public_key}>
+                        {wallet.name}
+                    </option>
+                ))}
+            </select>
+            <button onClick={handleSwapToSol}>Swap All to SOL</button>
+            {message && <p>{message}</p>}
+        </div>
+    );
 };
 
 export default SwapToSol;
+
