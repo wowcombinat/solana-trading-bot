@@ -165,6 +165,32 @@ app.post('/api/view-private-key', authenticateToken, async (req, res) => {
   }
 });
 
+app.post('/api/import-wallet', authenticateToken, async (req, res) => {
+  const { privateKey, accountName, password } = req.body;
+
+  try {
+    const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+    const publicKey = keypair.publicKey.toString();
+
+    const iv = crypto.randomBytes(16);
+    const key = crypto.scryptSync(password, 'salt', 32);
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+
+    let encryptedPrivateKey = cipher.update(privateKey, 'utf8', 'hex');
+    encryptedPrivateKey += cipher.final('hex');
+
+    await pool.query(
+      'INSERT INTO wallets (username, public_key, private_key, account_name, iv, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
+      [req.user.username, publicKey, encryptedPrivateKey, accountName, iv.toString('hex'), true]
+    );
+
+    res.json({ message: 'Wallet imported successfully', publicKey });
+  } catch (error) {
+    console.error('Error importing wallet:', error);
+    res.status(500).json({ error: 'Failed to import wallet' });
+  }
+});
+
 app.delete('/api/delete-wallet/:publicKey', authenticateToken, async (req, res) => {
   const { publicKey } = req.params;
 
