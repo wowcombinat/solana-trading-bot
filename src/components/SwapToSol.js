@@ -1,4 +1,3 @@
-// src/components/SwapToSol.js
 import React from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
@@ -15,10 +14,7 @@ const Button = styled.button`
 const SwapToSol = () => {
   const handleSwapAll = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/api/swap-all-to-sol', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.post('/api/swap-all-to-sol');
       alert('All assets swapped to SOL successfully');
     } catch (error) {
       console.error('Error swapping to SOL:', error);
