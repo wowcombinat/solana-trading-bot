@@ -1,10 +1,13 @@
-// client/src/App.js
 import React, { useState, useEffect } from 'react';
 import styled, { ThemeProvider } from 'styled-components';
 import { lightTheme, darkTheme, GlobalStyles } from './themes';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Header from './components/Header';
+import WalletManager from './components/WalletManager';
+import CreateWallet from './components/CreateWallet';
+import CopyTrading from './components/CopyTrading';
+import SwapToSol from './components/SwapToSol';
 import axios from 'axios';
 
 const AppWrapper = styled.div`
@@ -20,23 +23,27 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [theme, setTheme] = useState('light');
   const [username, setUsername] = useState('');
+  const [wallets, setWallets] = useState([]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      checkAuth();
+    const storedUsername = localStorage.getItem('username');
+    if (token && storedUsername) {
+      setIsAuthenticated(true);
+      setUsername(storedUsername);
+      fetchWallets();
     }
   }, []);
 
-  const checkAuth = async () => {
+  const fetchWallets = async () => {
     try {
-      const response = await axios.get('/api/user');
-      setIsAuthenticated(true);
-      setUsername(response.data.username);
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/wallets', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setWallets(response.data);
     } catch (error) {
-      console.error('Authentication failed:', error);
-      handleLogout();
+      console.error('Error fetching wallets:', error);
     }
   };
 
@@ -46,9 +53,10 @@ function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
+    localStorage.removeItem('username');
     setIsAuthenticated(false);
     setUsername('');
+    setWallets([]);
   };
 
   return (
@@ -63,7 +71,13 @@ function App() {
           username={username}
         />
         {isAuthenticated ? (
-          <Dashboard username={username} />
+          <>
+            <Dashboard username={username} />
+            <WalletManager wallets={wallets} onWalletUpdated={fetchWallets} />
+            <CreateWallet onWalletCreated={fetchWallets} />
+            <CopyTrading wallets={wallets} />
+            <SwapToSol />
+          </>
         ) : (
           <Auth setIsAuthenticated={setIsAuthenticated} setUsername={setUsername} />
         )}
