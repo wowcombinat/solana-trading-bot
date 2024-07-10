@@ -1,6 +1,6 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const { Pool } = require('pg');
+import { Pool } from 'pg';
 const pool = new Pool();
 
 const isValidPrivateKey = (key) => {
@@ -73,4 +73,4 @@ router.post('/swapalltosol', async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;
