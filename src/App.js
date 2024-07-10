@@ -4,6 +4,7 @@ import { lightTheme, darkTheme, GlobalStyles } from './themes';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Header from './components/Header';
+import axios from 'axios';
 
 const AppWrapper = styled.div`
   max-width: 1200px;
@@ -21,20 +22,37 @@ function App() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const storedUsername = localStorage.getItem('username');
-    if (token && storedUsername) {
-      setIsAuthenticated(true);
-      setUsername(storedUsername);
+    const savedTheme = localStorage.getItem('theme');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      checkAuth();
+    }
+    if (savedTheme) {
+      setTheme(savedTheme);
     }
   }, []);
 
+  const checkAuth = async () => {
+    try {
+      const response = await axios.get('/api/user');
+      setIsAuthenticated(true);
+      setUsername(response.data.username);
+    } catch (error) {
+      console.error('Authentication failed:', error);
+      handleLogout();
+    }
+  };
+
   const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
+    delete axios.defaults.headers.common['Authorization'];
     setIsAuthenticated(false);
     setUsername('');
   };
@@ -51,7 +69,7 @@ function App() {
           username={username}
         />
         {isAuthenticated ? (
-          <Dashboard username={username} />
+          <Dashboard username={username} theme={theme} />
         ) : (
           <Auth setIsAuthenticated={setIsAuthenticated} setUsername={setUsername} />
         )}
