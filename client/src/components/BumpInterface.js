@@ -9,30 +9,26 @@ const BumpWrapper = styled.div`
   margin-top: 20px;
 `;
 
+const Form = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
 const Input = styled.input`
-  width: 100%;
-  padding: 10px;
-  margin: 10px 0;
-  border-radius: 5px;
-  border: 1px solid ${props => props.theme.borderColor};
+  padding: 5px;
 `;
 
 const Select = styled.select`
-  width: 100%;
-  padding: 10px;
-  margin: 10px 0;
-  border-radius: 5px;
-  border: 1px solid ${props => props.theme.borderColor};
+  padding: 5px;
 `;
 
 const Button = styled.button`
+  padding: 10px;
   background-color: ${props => props.theme.primary};
   color: white;
-  padding: 10px 20px;
   border: none;
-  border-radius: 5px;
   cursor: pointer;
-  margin-top: 10px;
 `;
 
 const BumpInterface = ({ wallets }) => {
@@ -40,7 +36,8 @@ const BumpInterface = ({ wallets }) => {
   const [tokenAddress, setTokenAddress] = useState('');
   const [bumpAmount, setBumpAmount] = useState('');
 
-  const handleBump = async () => {
+  const handleBump = async (e) => {
+    e.preventDefault();
     try {
       const response = await axios.post('/api/bump', {
         walletPublicKey: selectedWallet,
@@ -51,34 +48,38 @@ const BumpInterface = ({ wallets }) => {
       alert('Bump instructions generated successfully!');
     } catch (error) {
       console.error('Error during bump:', error);
-      alert('Failed to perform bump');
+      alert('Failed to perform bump: ' + error.response?.data?.error || error.message);
     }
   };
 
   return (
     <BumpWrapper>
-      <h2>Bump Token</h2>
-      <Select value={selectedWallet} onChange={(e) => setSelectedWallet(e.target.value)}>
-        <option value="">Select Wallet</option>
-        {wallets.map(wallet => (
-          <option key={wallet.public_key} value={wallet.public_key}>
-            {wallet.account_name}
-          </option>
-        ))}
-      </Select>
-      <Input
-        type="text"
-        placeholder="Token Address"
-        value={tokenAddress}
-        onChange={(e) => setTokenAddress(e.target.value)}
-      />
-      <Input
-        type="number"
-        placeholder="Bump Amount (in SOL)"
-        value={bumpAmount}
-        onChange={(e) => setBumpAmount(e.target.value)}
-      />
-      <Button onClick={handleBump}>Bump</Button>
+      <h3>Bump Token</h3>
+      <Form onSubmit={handleBump}>
+        <Select value={selectedWallet} onChange={(e) => setSelectedWallet(e.target.value)} required>
+          <option value="">Select Wallet</option>
+          {wallets.map(wallet => (
+            <option key={wallet.public_key} value={wallet.public_key}>
+              {wallet.account_name}
+            </option>
+          ))}
+        </Select>
+        <Input
+          type="text"
+          placeholder="Token Address"
+          value={tokenAddress}
+          onChange={(e) => setTokenAddress(e.target.value)}
+          required
+        />
+        <Input
+          type="number"
+          placeholder="Bump Amount (in SOL)"
+          value={bumpAmount}
+          onChange={(e) => setBumpAmount(e.target.value)}
+          required
+        />
+        <Button type="submit">Bump</Button>
+      </Form>
     </BumpWrapper>
   );
 };
