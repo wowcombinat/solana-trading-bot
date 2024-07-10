@@ -26,6 +26,12 @@ function App() {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       checkAuth();
     }
+    
+    // Загрузка сохраненной темы из localStorage
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
   }, []);
 
   const checkAuth = async () => {
@@ -40,7 +46,9 @@ function App() {
   };
 
   const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme); // Сохранение выбранной темы в localStorage
   };
 
   const handleLogout = () => {
@@ -62,7 +70,7 @@ function App() {
           username={username}
         />
         {isAuthenticated ? (
-          <Dashboard username={username} />
+          <Dashboard username={username} theme={theme} />
         ) : (
           <Auth setIsAuthenticated={setIsAuthenticated} setUsername={setUsername} />
         )}
