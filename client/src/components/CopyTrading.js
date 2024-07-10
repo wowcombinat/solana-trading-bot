@@ -66,7 +66,6 @@ const CopyTrading = ({ wallets }) => {
         amount: parseFloat(amount)
       });
       alert('Copy trade executed successfully');
-      // Здесь можно добавить обновление состояния или другие действия после успешного копитрейдинга
     } catch (error) {
       console.error('Error executing copy trade:', error);
       alert('Failed to execute copy trade: ' + (error.response?.data?.error || error.message));
