@@ -1,6 +1,8 @@
 import express from 'express';
 const router = express.Router();
-import { Pool } from 'pg';
+import pkg from 'pg';
+const { Pool } = pkg;
+
 const pool = new Pool();
 
 const isValidPrivateKey = (key) => {
