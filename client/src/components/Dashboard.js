@@ -7,6 +7,8 @@ import SwapInterface from './SwapInterface';
 import BumpInterface from './BumpInterface';
 import AssetDisplay from './AssetDisplay';
 import CreateWallet from './CreateWallet';
+import CopyTrading from './CopyTrading';
+import SwapToSol from './SwapToSol';
 
 const DashboardWrapper = styled.div`
   display: grid;
@@ -76,6 +78,12 @@ const Dashboard = ({ username }) => {
       </Card>
       <Card>
         <BumpInterface wallets={wallets} />
+      </Card>
+      <Card>
+        <CopyTrading wallets={wallets} />
+      </Card>
+      <Card>
+        <SwapToSol />
       </Card>
     </DashboardWrapper>
   );
