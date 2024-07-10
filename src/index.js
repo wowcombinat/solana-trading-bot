@@ -169,12 +169,15 @@ app.post('/api/view-private-key', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/import-private-key', authenticateToken, async (req, res) => {
-  const { privateKey, accountName, password } = req.body;
+app.post('/api/import-wallet', authenticateToken, async (req, res) => {
+  const { password } = req.body;
 
   try {
-    const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+    const mnemonic = bip39.generateMnemonic();
+    const seed = await bip39.mnemonicToSeed(mnemonic);
+    const keypair = Keypair.fromSeed(seed.slice(0, 32));
     const publicKey = keypair.publicKey.toString();
+    const privateKey = bs58.encode(keypair.secretKey);
 
     const iv = crypto.randomBytes(16);
     const key = crypto.scryptSync(password, 'salt', 32);
@@ -183,15 +186,19 @@ app.post('/api/import-private-key', authenticateToken, async (req, res) => {
     let encryptedPrivateKey = cipher.update(privateKey, 'utf8', 'hex');
     encryptedPrivateKey += cipher.final('hex');
 
+    const mnemonicCipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+    let encryptedMnemonic = mnemonicCipher.update(mnemonic, 'utf8', 'hex');
+    encryptedMnemonic += mnemonicCipher.final('hex');
+
     await pool.query(
-      'INSERT INTO wallets (username, public_key, private_key, account_name, iv, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
-      [req.user.username, publicKey, encryptedPrivateKey, accountName, iv.toString('hex'), true]
+      'INSERT INTO wallets (username, public_key, private_key, mnemonic, account_name, iv, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [req.user.username, publicKey, encryptedPrivateKey, encryptedMnemonic, 'Imported Wallet', iv.toString('hex'), true]
     );
 
     res.json({ message: 'Wallet imported successfully', publicKey });
   } catch (error) {
-    console.error('Error importing private key:', error);
-    res.status(500).json({ error: 'Failed to import private key' });
+    console.error('Error importing wallet:', error);
+    res.status(500).json({ error: 'Failed to import wallet' });
   }
 });
 
@@ -199,11 +206,22 @@ app.post('/api/toggle-bot', authenticateToken, async (req, res) => {
   const { publicKey, isActive } = req.body;
 
   try {
-    await pool.query('UPDATE wallets SET is_active = $1 WHERE public_key = $2 AND username = $3', [isActive, publicKey, req.user.username]);
-    res.json({ message: isActive ? 'Bot started' : 'Bot stopped' });
+    console.log('Toggling bot:', { publicKey, isActive, username: req.user.username });
+    const result = await pool.query(
+      'UPDATE wallets SET is_active = $1 WHERE public_key = $2 AND username = $3 RETURNING *',
+      [isActive, publicKey, req.user.username]
+    );
+
+    if (result.rowCount === 0) {
+      console.log('Wallet not found');
+      return res.status(404).json({ error: 'Wallet not found' });
+    }
+
+    console.log('Bot toggled successfully');
+    res.json({ message: isActive ? 'Bot started' : 'Bot stopped', wallet: result.rows[0] });
   } catch (error) {
     console.error('Error toggling bot:', error);
-    res.status(500).json({ error: 'Failed to toggle bot' });
+    res.status(500).json({ error: 'Failed to toggle bot: ' + error.message });
   }
 });
 
@@ -211,11 +229,16 @@ app.put('/api/update-wallet', authenticateToken, async (req, res) => {
   const { publicKey, accountName, operationAmount, slippage, fee, isMaster } = req.body;
 
   try {
-    await pool.query(
-      'UPDATE wallets SET account_name = $1, operation_amount = $2, slippage = $3, fee = $4, is_master = $5 WHERE public_key = $6 AND username = $7',
+    const result = await pool.query(
+      'UPDATE wallets SET account_name = $1, operation_amount = $2, slippage = $3, fee = $4, is_master = $5 WHERE public_key = $6 AND username = $7 RETURNING *',
       [accountName, operationAmount, slippage, fee, isMaster, publicKey, req.user.username]
     );
-    res.json({ message: 'Wallet updated successfully' });
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Wallet not found' });
+    }
+
+    res.json({ message: 'Wallet updated successfully', wallet: result.rows[0] });
   } catch (error) {
     console.error('Error updating wallet:', error);
     res.status(500).json({ error: 'Failed to update wallet' });
@@ -243,116 +266,6 @@ app.get('/api/balance/:address', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching balance:', error);
     res.status(400).json({ error: error.message });
-  }
-});
-
-const SOL_ADDRESS = "So11111111111111111111111111111111111111112";
-
-app.post('/api/swap', authenticateToken, async (req, res) => {
-  const { fromToken, toToken, amount, walletPublicKey } = req.body;
-
-  try {
-    const walletResult = await pool.query('SELECT private_key, iv FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
-    
-    if (walletResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Wallet not found' });
-    }
-
-    const { private_key: encryptedPrivateKey, iv } = walletResult.rows[0];
-
-    // Здесь должна быть логика расшифровки приватного ключа и выполнения свапа
-    // Пример:
-    // const key = crypto.scryptSync(password, 'salt', 32);
-    // const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
-    // let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
-    // privateKey += decipher.final('utf8');
-    // const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
-    // const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
-    // const swapResponse = await solanaTracker.getSwapInstructions(...);
-
-    res.json({ message: 'Swap instructions generated', instructions: 'swapResponse' });
-  } catch (error) {
-    console.error('Error during swap:', error);
-    res.status(500).json({ error: 'Failed to perform swap' });
-  }
-});
-
-app.post('/api/bump', authenticateToken, async (req, res) => {
-  const { walletPublicKey, tokenAddress, bumpAmount } = req.body;
-
-  try {
-    const walletResult = await pool.query('SELECT private_key, iv FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
-    
-    if (walletResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Wallet not found' });
-    }
-
-    const { private_key: encryptedPrivateKey, iv } = walletResult.rows[0];
-
-    // Здесь должна быть логика расшифровки приватного ключа и выполнения bump
-    // Пример:
-    // const key = crypto.scryptSync(password, 'salt', 32);
-    // const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
-    // let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
-    // privateKey += decipher.final('utf8');
-    // const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
-    // const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
-    // const buyResponse = await solanaTracker.getSwapInstructions(...);
-    // const sellResponse = await solanaTracker.getSwapInstructions(...);
-
-    res.json({ message: 'Bump instructions generated', buyInstructions: 'buyResponse', sellInstructions: 'sellResponse' });
-  } catch (error) {
-    console.error('Error during bump:', error);
-    res.status(500).json({ error: 'Failed to perform bump' });
-  }
-});
-
-app.post('/api/swap-all-to-sol', authenticateToken, async (req, res) => {
-  try {
-    const walletsResult = await pool.query('SELECT public_key, private_key, iv FROM wallets WHERE username = $1', [req.user.username]);
-    
-    if (walletsResult.rows.length === 0) {
-      return res.status(404).json({ error: 'No wallets found' });
-    }
-
-    const results = [];
-
-    for (const wallet of walletsResult.rows) {
-      const { public_key, private_key: encryptedPrivateKey, iv } = wallet;
-
-      // Здесь должна быть логика расшифровки приватного ключа и выполнения свапа всех токенов на SOL
-      // Пример:
-      // const key = crypto.scryptSync(password, 'salt', 32);
-      // const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
-      // let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
-      // privateKey += decipher.final('utf8');
-      // const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
-      // const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
-
-      const tokenAccounts = await connection.getTokenAccountsByOwner(new PublicKey(public_key), {
-        programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-      });
-
-      for (const tokenAccount of tokenAccounts.value) {
-        const accountInfo = await connection.getTokenAccountBalance(tokenAccount.pubkey);
-        if (accountInfo.value.uiAmount > 0) {
-          // Здесь должна быть логика для обмена токена на SOL
-          // const swapResponse = await solanaTracker.getSwapInstructions(...);
-
-          results.push({
-            wallet: public_key,
-            token: tokenAccount.account.data.parsed.info.mint,
-            amount: accountInfo.value.uiAmount,
-            status: 'Swap instructions generated'
-          });
-        }
-      }
-    }
-
-    res.json({ message: 'All assets swapped to SOL', results });
-  } catch (error) {
-    console.error('Error swapping all assets to SOL:', error);
-    res.status(500).json({ error: 'Failed to swap assets to SOL' });
   }
 });
 
