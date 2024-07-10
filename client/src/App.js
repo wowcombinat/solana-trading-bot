@@ -4,10 +4,6 @@ import { lightTheme, darkTheme, GlobalStyles } from './themes';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Header from './components/Header';
-import WalletManager from './components/WalletManager';
-import CreateWallet from './components/CreateWallet';
-import CopyTrading from './components/CopyTrading';
-import SwapToSol from './components/SwapToSol';
 import axios from 'axios';
 
 const AppWrapper = styled.div`
@@ -23,27 +19,23 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [theme, setTheme] = useState('light');
   const [username, setUsername] = useState('');
-  const [wallets, setWallets] = useState([]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const storedUsername = localStorage.getItem('username');
-    if (token && storedUsername) {
-      setIsAuthenticated(true);
-      setUsername(storedUsername);
-      fetchWallets();
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      checkAuth();
     }
   }, []);
 
-  const fetchWallets = async () => {
+  const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/wallets', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setWallets(response.data);
+      const response = await axios.get('/api/user');
+      setIsAuthenticated(true);
+      setUsername(response.data.username);
     } catch (error) {
-      console.error('Error fetching wallets:', error);
+      console.error('Authentication failed:', error);
+      handleLogout();
     }
   };
 
@@ -53,10 +45,9 @@ function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('username');
+    delete axios.defaults.headers.common['Authorization'];
     setIsAuthenticated(false);
     setUsername('');
-    setWallets([]);
   };
 
   return (
@@ -71,13 +62,7 @@ function App() {
           username={username}
         />
         {isAuthenticated ? (
-          <>
-            <Dashboard username={username} />
-            <WalletManager wallets={wallets} onWalletUpdated={fetchWallets} />
-            <CreateWallet onWalletCreated={fetchWallets} />
-            <CopyTrading wallets={wallets} />
-            <SwapToSol />
-          </>
+          <Dashboard username={username} />
         ) : (
           <Auth setIsAuthenticated={setIsAuthenticated} setUsername={setUsername} />
         )}
