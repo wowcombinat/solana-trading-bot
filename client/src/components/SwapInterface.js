@@ -1,4 +1,3 @@
-// client/src/components/SwapInterface.js
 import React, { useState } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
@@ -36,23 +35,17 @@ const Button = styled.button`
   margin-top: 10px;
 `;
 
-const SOL_ADDRESS = "So11111111111111111111111111111111111111112";
-
 const SwapInterface = ({ wallets }) => {
-  const [fromToken, setFromToken] = useState('SOL');
+  const [fromToken, setFromToken] = useState('');
   const [toToken, setToToken] = useState('');
   const [amount, setAmount] = useState('');
   const [selectedWallet, setSelectedWallet] = useState('');
-  const [customFromToken, setCustomFromToken] = useState('');
-  const [customToToken, setCustomToToken] = useState('');
 
   const handleSwap = async () => {
     try {
-      const fromTokenAddress = fromToken === 'SOL' ? SOL_ADDRESS : customFromToken;
-      const toTokenAddress = toToken === 'SOL' ? SOL_ADDRESS : customToToken;
       const response = await axios.post('/api/swap', {
-        fromToken: fromTokenAddress,
-        toToken: toTokenAddress,
+        fromToken,
+        toToken,
         amount: parseFloat(amount),
         walletPublicKey: selectedWallet
       });
@@ -75,30 +68,18 @@ const SwapInterface = ({ wallets }) => {
           </option>
         ))}
       </Select>
-      <Select value={fromToken} onChange={(e) => setFromToken(e.target.value)}>
-        <option value="SOL">SOL</option>
-        <option value="custom">Custom Token</option>
-      </Select>
-      {fromToken === 'custom' && (
-        <Input
-          type="text"
-          placeholder="From Token Address"
-          value={customFromToken}
-          onChange={(e) => setCustomFromToken(e.target.value)}
-        />
-      )}
-      <Select value={toToken} onChange={(e) => setToToken(e.target.value)}>
-        <option value="SOL">SOL</option>
-        <option value="custom">Custom Token</option>
-      </Select>
-      {toToken === 'custom' && (
-        <Input
-          type="text"
-          placeholder="To Token Address"
-          value={customToToken}
-          onChange={(e) => setCustomToToken(e.target.value)}
-        />
-      )}
+      <Input
+        type="text"
+        placeholder="From Token Address"
+        value={fromToken}
+        onChange={(e) => setFromToken(e.target.value)}
+      />
+      <Input
+        type="text"
+        placeholder="To Token Address"
+        value={toToken}
+        onChange={(e) => setToToken(e.target.value)}
+      />
       <Input
         type="number"
         placeholder="Amount"
