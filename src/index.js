@@ -11,6 +11,8 @@ import { SolanaTracker } from "solana-swap";
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import * as bip39 from 'bip39';
+import http from 'http';
+import { Server } from 'socket.io';
 
 dotenv.config();
 
@@ -18,6 +20,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
 const port = process.env.PORT || 3000;
 
 const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com', 'confirmed');
@@ -108,8 +113,37 @@ app.get('/api/wallets', authenticateToken, async (req, res) => {
   }
 });
 
+app.post('/api/add-wallet', authenticateToken, async (req, res) => {
+  const { privateKey, accountName, isMaster } = req.body;
+  
+  if (!privateKey) {
+    return res.status(400).json({ error: 'Private key is required' });
+  }
+
+  try {
+    const decodedPrivateKey = bs58.decode(privateKey);
+    
+    if (decodedPrivateKey.length !== 64) {
+      throw new Error('Invalid private key length');
+    }
+
+    const keypair = Keypair.fromSecretKey(decodedPrivateKey);
+    const publicKey = keypair.publicKey.toString();
+
+    await pool.query(
+      'INSERT INTO wallets (username, public_key, private_key, account_name, is_master) VALUES ($1, $2, $3, $4, $5)',
+      [req.user.username, publicKey, privateKey, accountName, isMaster]
+    );
+
+    res.json({ message: 'Wallet added successfully', publicKey });
+  } catch (error) {
+    console.error('Error adding wallet:', error);
+    res.status(400).json({ error: error.message || 'Invalid private key' });
+  }
+});
+
 app.post('/api/create-wallet', authenticateToken, async (req, res) => {
-  const { accountName, isMaster, password, operationAmount, slippage, fee } = req.body;
+  const { accountName, isMaster, password } = req.body;
   
   try {
     const mnemonic = bip39.generateMnemonic();
@@ -118,20 +152,17 @@ app.post('/api/create-wallet', authenticateToken, async (req, res) => {
     const publicKey = keypair.publicKey.toString();
     const privateKey = bs58.encode(keypair.secretKey);
 
-    const iv = crypto.randomBytes(16);
-    const key = crypto.scryptSync(password, 'salt', 32);
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-
+    const cipher = crypto.createCipher('aes-256-cbc', password);
     let encryptedPrivateKey = cipher.update(privateKey, 'utf8', 'hex');
     encryptedPrivateKey += cipher.final('hex');
 
-    const mnemonicCipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+    const mnemonicCipher = crypto.createCipher('aes-256-cbc', password);
     let encryptedMnemonic = mnemonicCipher.update(mnemonic, 'utf8', 'hex');
     encryptedMnemonic += mnemonicCipher.final('hex');
 
     await pool.query(
-      'INSERT INTO wallets (username, public_key, private_key, mnemonic, account_name, is_master, operation_amount, slippage, fee, iv, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-      [req.user.username, publicKey, encryptedPrivateKey, encryptedMnemonic, accountName, isMaster, operationAmount, slippage, fee, iv.toString('hex'), true]
+      'INSERT INTO wallets (username, public_key, private_key, mnemonic, account_name, is_master) VALUES ($1, $2, $3, $4, $5, $6)',
+      [req.user.username, publicKey, encryptedPrivateKey, encryptedMnemonic, accountName, isMaster]
     );
 
     res.json({ message: 'Wallet created successfully', publicKey });
@@ -141,53 +172,30 @@ app.post('/api/create-wallet', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/view-private-key', authenticateToken, async (req, res) => {
+app.post('/api/get-wallet-details', authenticateToken, async (req, res) => {
   const { publicKey, password } = req.body;
 
   try {
-    const result = await pool.query('SELECT private_key, iv FROM wallets WHERE public_key = $1 AND username = $2', [publicKey, req.user.username]);
+    const result = await pool.query('SELECT private_key, mnemonic FROM wallets WHERE public_key = $1 AND username = $2', [publicKey, req.user.username]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Wallet not found' });
     }
 
-    const { private_key: encryptedPrivateKey, iv } = result.rows[0];
+    const { private_key: encryptedPrivateKey, mnemonic: encryptedMnemonic } = result.rows[0];
 
-    const key = crypto.scryptSync(password, 'salt', 32);
-    const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
+    const decipher = crypto.createDecipher('aes-256-cbc', password);
     let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
     privateKey += decipher.final('utf8');
 
-    res.json({ privateKey });
+    const mnemonicDecipher = crypto.createDecipher('aes-256-cbc', password);
+    let mnemonic = mnemonicDecipher.update(encryptedMnemonic, 'hex', 'utf8');
+    mnemonic += mnemonicDecipher.final('utf8');
+
+    res.json({ privateKey, mnemonic });
   } catch (error) {
-    console.error('Error viewing private key:', error);
-    res.status(500).json({ error: 'Failed to view private key' });
-  }
-});
-
-app.post('/api/import-wallet', authenticateToken, async (req, res) => {
-  const { privateKey, accountName, password } = req.body;
-
-  try {
-    const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
-    const publicKey = keypair.publicKey.toString();
-
-    const iv = crypto.randomBytes(16);
-    const key = crypto.scryptSync(password, 'salt', 32);
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-
-    let encryptedPrivateKey = cipher.update(privateKey, 'utf8', 'hex');
-    encryptedPrivateKey += cipher.final('hex');
-
-    await pool.query(
-      'INSERT INTO wallets (username, public_key, private_key, account_name, iv, is_active) VALUES ($1, $2, $3, $4, $5, $6)',
-      [req.user.username, publicKey, encryptedPrivateKey, accountName, iv.toString('hex'), true]
-    );
-
-    res.json({ message: 'Wallet imported successfully', publicKey });
-  } catch (error) {
-    console.error('Error importing wallet:', error);
-    res.status(500).json({ error: 'Failed to import wallet' });
+    console.error('Error getting wallet details:', error);
+    res.status(500).json({ error: 'Failed to get wallet details' });
   }
 });
 
@@ -205,49 +213,6 @@ app.delete('/api/delete-wallet/:publicKey', authenticateToken, async (req, res) 
   } catch (error) {
     console.error('Error deleting wallet:', error);
     res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/api/toggle-bot', authenticateToken, async (req, res) => {
-  const { publicKey, isActive } = req.body;
-
-  try {
-    console.log('Toggling bot:', { publicKey, isActive, username: req.user.username });
-    const result = await pool.query(
-      'UPDATE wallets SET is_active = $1 WHERE public_key = $2 AND username = $3 RETURNING *',
-      [isActive, publicKey, req.user.username]
-    );
-
-    if (result.rowCount === 0) {
-      console.log('Wallet not found');
-      return res.status(404).json({ error: 'Wallet not found' });
-    }
-
-    console.log('Bot toggled successfully');
-    res.json({ message: isActive ? 'Bot started' : 'Bot stopped', wallet: result.rows[0] });
-  } catch (error) {
-    console.error('Error toggling bot:', error);
-    res.status(500).json({ error: 'Failed to toggle bot: ' + error.message });
-  }
-});
-
-app.put('/api/update-wallet', authenticateToken, async (req, res) => {
-  const { publicKey, accountName, operationAmount, slippage, fee, isMaster } = req.body;
-
-  try {
-    const result = await pool.query(
-      'UPDATE wallets SET account_name = $1, operation_amount = $2, slippage = $3, fee = $4, is_master = $5 WHERE public_key = $6 AND username = $7 RETURNING *',
-      [accountName, operationAmount, slippage, fee, isMaster, publicKey, req.user.username]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Wallet not found' });
-    }
-
-    res.json({ message: 'Wallet updated successfully', wallet: result.rows[0] });
-  } catch (error) {
-    console.error('Error updating wallet:', error);
-    res.status(500).json({ error: 'Failed to update wallet' });
   }
 });
 
@@ -275,10 +240,114 @@ app.get('/api/balance/:address', authenticateToken, async (req, res) => {
   }
 });
 
+const SOL_ADDRESS = "So11111111111111111111111111111111111111112";
+
+app.post('/api/swap', authenticateToken, async (req, res) => {
+  const { fromToken, toToken, amount, walletPublicKey } = req.body;
+
+  try {
+    const walletResult = await pool.query('SELECT private_key FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
+    
+    if (walletResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Wallet not found' });
+    }
+
+    const privateKey = walletResult.rows[0].private_key;
+    const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+
+    const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
+
+    const swapResponse = await solanaTracker.getSwapInstructions(
+      fromToken === 'SOL' ? SOL_ADDRESS : fromToken,
+      toToken === 'SOL' ? SOL_ADDRESS : toToken,
+      amount,
+      1, // slippage
+      walletPublicKey,
+      0.0005, // priority fee
+      false // Force legacy transaction for Jupiter
+    );
+
+    res.json({ message: 'Swap instructions generated', instructions: swapResponse });
+  } catch (error) {
+    console.error('Error during swap:', error);
+    res.status(500).json({ error: 'Failed to perform swap' });
+  }
+});
+
+app.post('/api/bump', authenticateToken, async (req, res) => {
+  const { walletPublicKey, tokenAddress, bumpAmount } = req.body;
+
+  try {
+    const walletResult = await pool.query('SELECT private_key FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
+    
+    if (walletResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Wallet not found' });
+    }
+
+    const privateKey = walletResult.rows[0].private_key;
+    const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+
+    const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
+
+    const buyResponse = await solanaTracker.getSwapInstructions(
+      SOL_ADDRESS,
+      tokenAddress,
+      bumpAmount,
+      1, // slippage
+      walletPublicKey,
+      0.0005, // priority fee
+      false // Force legacy transaction for Jupiter
+    );
+
+    const sellResponse = await solanaTracker.getSwapInstructions(
+      tokenAddress,
+      SOL_ADDRESS,
+      bumpAmount,
+      1, // slippage
+      walletPublicKey,
+      0.0005, // priority fee
+      false // Force legacy transaction for Jupiter
+    );
+
+    res.json({ message: 'Bump instructions generated', buyInstructions: buyResponse, sellInstructions: sellResponse });
+  } catch (error) {
+    console.error('Error during bump:', error);
+    res.status(500).json({ error: 'Failed to perform bump' });
+  }
+});
+
+app.get('/api/transaction-history', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM transactions WHERE wallet_id IN (SELECT public_key FROM wallets WHERE username = $1) ORDER BY timestamp DESC', [req.user.username]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching transaction history:', error);
+    res.status(500).json({ error: 'Failed to fetch transaction history' });
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log('New WebSocket connection');
+
+  socket.on('subscribe', async (data) => {
+    if (data.walletAddress) {
+      const publicKey = new PublicKey(data.walletAddress);
+      
+      connection.onLogs(publicKey, (logs) => {
+        socket.emit('transaction', { type: 'transaction', data: logs });
+      }, 'confirmed');
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('WebSocket disconnected');
+  });
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
