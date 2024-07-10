@@ -68,4 +68,3 @@ const WalletManager = () => {
 };
 
 export default WalletManager;
-
