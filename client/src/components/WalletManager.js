@@ -1,118 +1,96 @@
-import React, { useState } from 'react';
+// src/components/WalletManager.js
+import React from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
 
-const WalletManagerWrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
 `;
 
-const Form = styled.form`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+const Th = styled.th`
+  background-color: #f2f2f2;
+  padding: 12px;
+  text-align: left;
 `;
 
-const Input = styled.input`
-  padding: 10px;
-  border-radius: 5px;
-  border: 1px solid ${props => props.theme.borderColor};
+const Td = styled.td`
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
 `;
 
 const Button = styled.button`
-  background-color: ${props => props.theme.secondary};
+  padding: 5px 10px;
+  background-color: #f44336;
   color: white;
   border: none;
-  padding: 10px;
-  border-radius: 5px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
-
-  &:hover {
-    background-color: ${props => props.theme.primary};
-  }
 `;
 
-const WalletList = styled.ul`
-  list-style-type: none;
-  padding: 0;
-`;
-
-const WalletItem = styled.li`
-  background-color: ${props => props.theme.cardBackground};
-  padding: 10px;
-  border-radius: 5px;
+const ExportButton = styled(Button)`
+  background-color: #4CAF50;
   margin-bottom: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 `;
 
-const ErrorMessage = styled.p`
-  color: ${props => props.theme.error};
-`;
-
-function WalletManager({ wallets, onWalletAdded, onWalletDeleted }) {
-  const [privateKey, setPrivateKey] = useState('');
-  const [accountName, setAccountName] = useState('');
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+const WalletManager = ({ wallets, onWalletUpdated }) => {
+  const handleDelete = async (publicKey) => {
     try {
-      await axios.post('/api/add-wallet', { privateKey, accountName });
-      setPrivateKey('');
-      setAccountName('');
-      onWalletAdded();
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/delete-wallet/${publicKey}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      onWalletUpdated();
     } catch (error) {
-      console.error('Error adding wallet:', error);
-      setError(error.response?.data?.error || 'Failed to add wallet');
+      console.error('Error deleting wallet:', error);
+      alert('Failed to delete wallet: ' + error.response?.data?.error || error.message);
     }
   };
 
-  const handleDelete = async (publicKey) => {
-    try {
-      await axios.delete(`/api/delete-wallet/${publicKey}`);
-      onWalletDeleted();
-    } catch (error) {
-      console.error('Error deleting wallet:', error);
-      setError(error.response?.data?.error || 'Failed to delete wallet');
-    }
+  const handleExportCSV = () => {
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + "Login,Public Key,Balances,Copy Trading Amount,Type\n"
+      + wallets.map(w => `${w.account_name},${w.public_key},${w.balances},${w.copy_trading_amount},${w.is_master ? 'Master' : 'Follower'}`).join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "wallets.csv");
+    document.body.appendChild(link);
+    link.click();
   };
 
   return (
-    <WalletManagerWrapper>
-      <h3>Add New Wallet</h3>
-      <Form onSubmit={handleSubmit}>
-        <Input
-          type="text"
-          placeholder="Private Key"
-          value={privateKey}
-          onChange={(e) => setPrivateKey(e.target.value)}
-        />
-        <Input
-          type="text"
-          placeholder="Account Name"
-          value={accountName}
-          onChange={(e) => setAccountName(e.target.value)}
-        />
-        <Button type="submit">Add Wallet</Button>
-      </Form>
-      {error && <ErrorMessage>{error}</ErrorMessage>}
-
-      <h3>Your Wallets</h3>
-      <WalletList>
-        {wallets.map((wallet) => (
-          <WalletItem key={wallet.public_key}>
-            <span>{wallet.account_name} - {wallet.public_key.slice(0, 10)}...</span>
-            <Button onClick={() => handleDelete(wallet.public_key)}>Delete</Button>
-          </WalletItem>
-        ))}
-      </WalletList>
-    </WalletManagerWrapper>
+    <div>
+      <h2>Wallet Manager</h2>
+      <ExportButton onClick={handleExportCSV}>Export to CSV</ExportButton>
+      <Table>
+        <thead>
+          <tr>
+            <Th>Login</Th>
+            <Th>Public Key</Th>
+            <Th>Balances</Th>
+            <Th>Copy Trading Amount</Th>
+            <Th>Type</Th>
+            <Th>Actions</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {wallets.map((wallet) => (
+            <tr key={wallet.public_key}>
+              <Td>{wallet.account_name}</Td>
+              <Td>{wallet.public_key}</Td>
+              <Td>{wallet.balances}</Td>
+              <Td>{wallet.copy_trading_amount}</Td>
+              <Td>{wallet.is_master ? 'Master' : 'Follower'}</Td>
+              <Td>
+                <Button onClick={() => handleDelete(wallet.public_key)}>Delete</Button>
+              </Td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+    </div>
   );
-}
+};
 
 export default WalletManager;
