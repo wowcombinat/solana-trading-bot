@@ -57,7 +57,7 @@ const ImportPrivateKey = ({ onImport }) => {
       onImport();
     } catch (error) {
       console.error('Error importing wallet:', error);
-      alert('Failed to import wallet');
+      alert('Failed to import wallet: ' + (error.response?.data?.error || error.message));
     }
   };
 
