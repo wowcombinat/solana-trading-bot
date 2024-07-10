@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "heroku-prebuild": "npm install --force",
-    "heroku-postbuild": "cd client && npm install --force && npm install --save-dev @babel/plugin-proposal-private-property-in-object && npm run build"
+    "heroku-postbuild": "cd client && npm install --force && npm install --save socket.io-client && npm install --save-dev @babel/plugin-proposal-private-property-in-object && npm run build"
   },
   "dependencies": {
     "express": "^4.17.1",
@@ -18,7 +18,8 @@
     "dotenv": "^10.0.0",
     "bs58": "^4.0.1",
     "bip39": "^3.0.4",
-    "solana-swap": "^1.0.14"
+    "solana-swap": "^1.0.14",
+    "socket.io": "^4.5.1"
   },
   "engines": {
     "node": "16.x",
