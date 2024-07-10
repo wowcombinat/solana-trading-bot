@@ -1,4 +1,4 @@
-// client/src/components/CreateWallet.js
+// src/components/CreateWallet.js
 import React, { useState } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
