@@ -16,4 +16,18 @@ const SwapToSol = () => {
     try {
       await axios.post('/api/swap-all-to-sol');
       alert('All assets swapped to SOL successfully');
-    } catch (error)
+    } catch (error) {
+      console.error('Error swapping to SOL:', error);
+      alert('Failed to swap assets to SOL: ' + error.response?.data?.error || error.message);
+    }
+  };
+
+  return (
+    <div>
+      <h3>Swap All Assets to SOL</h3>
+      <Button onClick={handleSwapAll}>Swap All to SOL</Button>
+    </div>
+  );
+};
+
+export default SwapToSol;
