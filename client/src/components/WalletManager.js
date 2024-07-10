@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import axios from 'axios';
-import styled from 'styled-components';
+import styled, { ThemeContext } from 'styled-components';
 import ViewPrivateKey from './ViewPrivateKey';
 import ImportPrivateKey from './ImportPrivateKey';
 
 const WalletManagerWrapper = styled.div`
-  background-color: #ffffff;
+  background-color: ${props => props.theme.cardBackground};
+  color: ${props => props.theme.text};
   border-radius: 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   padding: 24px;
@@ -14,7 +15,7 @@ const WalletManagerWrapper = styled.div`
 `;
 
 const Title = styled.h2`
-  color: #1098fc;
+  color: ${props => props.theme.primary};
   font-size: 24px;
   margin-bottom: 20px;
   text-align: center;
@@ -27,20 +28,20 @@ const Table = styled.table`
 `;
 
 const Th = styled.th`
-  background-color: #f8f9fa;
-  color: #495057;
+  background-color: ${props => props.theme.tableHeader};
+  color: ${props => props.theme.text};
   padding: 12px;
   text-align: left;
-  border-bottom: 2px solid #dee2e6;
+  border-bottom: 2px solid ${props => props.theme.borderColor};
 `;
 
 const Td = styled.td`
   padding: 12px;
-  border-bottom: 1px solid #dee2e6;
+  border-bottom: 1px solid ${props => props.theme.borderColor};
 `;
 
 const Button = styled.button`
-  background-color: #1098fc;
+  background-color: ${props => props.theme.primary};
   color: white;
   border: none;
   padding: 8px 12px;
@@ -50,7 +51,14 @@ const Button = styled.button`
   margin-right: 8px;
 
   &:hover {
-    background-color: #0d8aec;
+    background-color: ${props => props.theme.secondary};
+  }
+`;
+
+const DeleteButton = styled(Button)`
+  background-color: ${props => props.theme.error};
+  &:hover {
+    background-color: ${props => props.theme.errorHover};
   }
 `;
 
@@ -59,19 +67,22 @@ const EditForm = styled.form`
   flex-direction: column;
   gap: 12px;
   margin-top: 20px;
-  background-color: #f8f9fa;
+  background-color: ${props => props.theme.cardBackground};
   padding: 20px;
   border-radius: 6px;
 `;
 
 const Input = styled.input`
   padding: 8px;
-  border: 1px solid #dcdcdc;
+  border: 1px solid ${props => props.theme.borderColor};
   border-radius: 4px;
+  background-color: ${props => props.theme.inputBackground};
+  color: ${props => props.theme.text};
 `;
 
 const WalletManager = ({ wallets, onWalletUpdated }) => {
   const [editingWallet, setEditingWallet] = useState(null);
+  const theme = useContext(ThemeContext);
 
   const handleToggleBot = async (publicKey, isActive) => {
     try {
@@ -102,6 +113,22 @@ const WalletManager = ({ wallets, onWalletUpdated }) => {
     } catch (error) {
       console.error('Error updating wallet:', error);
       alert('Failed to update wallet: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const handleDeleteWallet = async (publicKey) => {
+    if (window.confirm('Are you sure you want to delete this wallet?')) {
+      try {
+        const response = await axios.delete(`/api/delete-wallet/${publicKey}`);
+        if (response.status === 200) {
+          onWalletUpdated();
+        } else {
+          throw new Error('Failed to delete wallet');
+        }
+      } catch (error) {
+        console.error('Error deleting wallet:', error);
+        alert('Failed to delete wallet: ' + (error.response?.data?.error || error.message));
+      }
     }
   };
 
@@ -137,6 +164,7 @@ const WalletManager = ({ wallets, onWalletUpdated }) => {
                   {wallet.is_active ? 'Stop' : 'Start'}
                 </Button>
                 <Button onClick={() => setEditingWallet(wallet)}>Edit</Button>
+                <DeleteButton onClick={() => handleDeleteWallet(wallet.public_key)}>Delete</DeleteButton>
                 <ViewPrivateKey publicKey={wallet.public_key} />
               </Td>
             </tr>
