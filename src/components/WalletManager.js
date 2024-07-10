@@ -1,7 +1,12 @@
-// src/components/WalletManager.js
-import React from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
+
+const WalletManagerWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+`;
 
 const Table = styled.table`
   width: 100%;
@@ -9,47 +14,39 @@ const Table = styled.table`
 `;
 
 const Th = styled.th`
-  background-color: #f2f2f2;
-  padding: 12px;
+  background-color: ${props => props.theme.primary};
+  color: white;
+  padding: 10px;
   text-align: left;
 `;
 
 const Td = styled.td`
-  padding: 12px;
-  border-bottom: 1px solid #ddd;
+  padding: 10px;
+  border-bottom: 1px solid ${props => props.theme.borderColor};
 `;
 
 const Button = styled.button`
   padding: 5px 10px;
-  background-color: #f44336;
+  background-color: ${props => props.theme.secondary};
   color: white;
   border: none;
   cursor: pointer;
 `;
 
-const ExportButton = styled(Button)`
-  background-color: #4CAF50;
-  margin-bottom: 10px;
-`;
-
-const WalletManager = ({ wallets, onWalletUpdated }) => {
+const WalletManager = ({ wallets, onWalletAdded, onWalletDeleted }) => {
   const handleDelete = async (publicKey) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/api/delete-wallet/${publicKey}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      onWalletUpdated();
+      await axios.delete(`/api/delete-wallet/${publicKey}`);
+      onWalletDeleted();
     } catch (error) {
       console.error('Error deleting wallet:', error);
-      alert('Failed to delete wallet: ' + error.response?.data?.error || error.message);
     }
   };
 
   const handleExportCSV = () => {
     const csvContent = "data:text/csv;charset=utf-8," 
-      + "Login,Public Key,Balances,Copy Trading Amount,Type\n"
-      + wallets.map(w => `${w.account_name},${w.public_key},${w.balances},${w.copy_trading_amount},${w.is_master ? 'Master' : 'Follower'}`).join("\n");
+      + "Account Name,Public Key,Operation Amount,Slippage,Fee,Is Master\n"
+      + wallets.map(w => `${w.account_name},${w.public_key},${w.operation_amount},${w.slippage},${w.fee},${w.is_master}`).join("\n");
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -60,17 +57,18 @@ const WalletManager = ({ wallets, onWalletUpdated }) => {
   };
 
   return (
-    <div>
-      <h2>Wallet Manager</h2>
-      <ExportButton onClick={handleExportCSV}>Export to CSV</ExportButton>
+    <WalletManagerWrapper>
+      <h3>Your Wallets</h3>
+      <Button onClick={handleExportCSV}>Export to CSV</Button>
       <Table>
         <thead>
           <tr>
-            <Th>Login</Th>
+            <Th>Account Name</Th>
             <Th>Public Key</Th>
-            <Th>Balances</Th>
-            <Th>Copy Trading Amount</Th>
-            <Th>Type</Th>
+            <Th>Operation Amount</Th>
+            <Th>Slippage</Th>
+            <Th>Fee</Th>
+            <Th>Is Master</Th>
             <Th>Actions</Th>
           </tr>
         </thead>
@@ -79,9 +77,10 @@ const WalletManager = ({ wallets, onWalletUpdated }) => {
             <tr key={wallet.public_key}>
               <Td>{wallet.account_name}</Td>
               <Td>{wallet.public_key}</Td>
-              <Td>{wallet.balances}</Td>
-              <Td>{wallet.copy_trading_amount}</Td>
-              <Td>{wallet.is_master ? 'Master' : 'Follower'}</Td>
+              <Td>{wallet.operation_amount}</Td>
+              <Td>{wallet.slippage}</Td>
+              <Td>{wallet.fee}</Td>
+              <Td>{wallet.is_master ? 'Yes' : 'No'}</Td>
               <Td>
                 <Button onClick={() => handleDelete(wallet.public_key)}>Delete</Button>
               </Td>
@@ -89,7 +88,7 @@ const WalletManager = ({ wallets, onWalletUpdated }) => {
           ))}
         </tbody>
       </Table>
-    </div>
+    </WalletManagerWrapper>
   );
 };
 
