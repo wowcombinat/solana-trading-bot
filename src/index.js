@@ -1,11 +1,11 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const { Pool } = require('pg');
-const path = require('path');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
-const wallets = require('./wallets');
+import express from 'express';
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import { Pool } from 'pg';
+import path from 'path';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import wallets from './wallets.js';
 
 const app = express();
 const port = process.env.PORT || 5000;
