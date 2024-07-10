@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Connection, PublicKey, Keypair } from "@solana/web3.js";
+import { Connection, PublicKey, Keypair, Transaction } from "@solana/web3.js";
 import pkg from 'pg';
 const { Pool } = pkg;
 import bcrypt from 'bcrypt';
@@ -138,7 +138,7 @@ app.post('/api/add-wallet', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/create-wallet', authenticateToken, async (req, res) => {
-  const { accountName, isMaster } = req.body;
+  const { accountName, isMaster, password } = req.body;
   
   try {
     const mnemonic = bip39.generateMnemonic();
@@ -147,9 +147,18 @@ app.post('/api/create-wallet', authenticateToken, async (req, res) => {
     const publicKey = keypair.publicKey.toString();
     const privateKey = bs58.encode(keypair.secretKey);
 
+    // Шифруем приватный ключ и мнемоническую фразу
+    const cipher = crypto.createCipher('aes-256-cbc', password);
+    let encryptedPrivateKey = cipher.update(privateKey, 'utf8', 'hex');
+    encryptedPrivateKey += cipher.final('hex');
+
+    const mnemonicCipher = crypto.createCipher('aes-256-cbc', password);
+    let encryptedMnemonic = mnemonicCipher.update(mnemonic, 'utf8', 'hex');
+    encryptedMnemonic += mnemonicCipher.final('hex');
+
     await pool.query(
       'INSERT INTO wallets (username, public_key, private_key, mnemonic, account_name, is_master) VALUES ($1, $2, $3, $4, $5, $6)',
-      [req.user.username, publicKey, privateKey, mnemonic, accountName, isMaster]
+      [req.user.username, publicKey, encryptedPrivateKey, encryptedMnemonic, accountName, isMaster]
     );
 
     res.json({ message: 'Wallet created successfully', publicKey });
@@ -160,7 +169,7 @@ app.post('/api/create-wallet', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/get-wallet-details', authenticateToken, async (req, res) => {
-  const { publicKey } = req.body;
+  const { publicKey, password } = req.body;
 
   try {
     const result = await pool.query('SELECT private_key, mnemonic FROM wallets WHERE public_key = $1 AND username = $2', [publicKey, req.user.username]);
@@ -171,7 +180,16 @@ app.post('/api/get-wallet-details', authenticateToken, async (req, res) => {
 
     const { private_key: encryptedPrivateKey, mnemonic: encryptedMnemonic } = result.rows[0];
 
-    res.json({ privateKey: encryptedPrivateKey, mnemonic: encryptedMnemonic });
+    // Расшифровываем приватный ключ и мнемоническую фразу
+    const decipher = crypto.createDecipher('aes-256-cbc', password);
+    let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
+    privateKey += decipher.final('utf8');
+
+    const mnemonicDecipher = crypto.createDecipher('aes-256-cbc', password);
+    let mnemonic = mnemonicDecipher.update(encryptedMnemonic, 'hex', 'utf8');
+    mnemonic += mnemonicDecipher.final('utf8');
+
+    res.json({ privateKey, mnemonic });
   } catch (error) {
     console.error('Error getting wallet details:', error);
     res.status(500).json({ error: 'Failed to get wallet details' });
