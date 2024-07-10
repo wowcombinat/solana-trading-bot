@@ -7,6 +7,8 @@ const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-width: 300px;
+  margin: 20px 0;
 `;
 
 const Input = styled.input`
@@ -24,17 +26,24 @@ const Button = styled.button`
 const CreateWallet = ({ onWalletCreated }) => {
   const [accountName, setAccountName] = useState('');
   const [isMaster, setIsMaster] = useState(false);
+  const [password, setPassword] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('/api/create-wallet', { accountName, isMaster });
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/create-wallet', 
+        { accountName, isMaster, password },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       console.log('Wallet created:', response.data);
       setAccountName('');
       setIsMaster(false);
+      setPassword('');
       onWalletCreated();
     } catch (error) {
       console.error('Error creating wallet:', error);
+      alert('Failed to create wallet: ' + error.response?.data?.error || error.message);
     }
   };
 
@@ -47,6 +56,13 @@ const CreateWallet = ({ onWalletCreated }) => {
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
           placeholder="Account Name"
+          required
+        />
+        <Input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Encryption Password"
           required
         />
         <label>
