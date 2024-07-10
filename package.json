@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "heroku-prebuild": "npm install --force",
-    "heroku-postbuild": "npm install --prefix client --force && npm run build --prefix client"
+    "heroku-postbuild": "cd client && npm install --force && npm install --save-dev @babel/plugin-proposal-private-property-in-object && npm run build"
   },
   "dependencies": {
     "express": "^4.17.1",
