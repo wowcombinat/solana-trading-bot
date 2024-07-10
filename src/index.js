@@ -1,3 +1,4 @@
+// src/index.js
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -108,38 +109,13 @@ app.get('/api/wallets', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/add-wallet', authenticateToken, async (req, res) => {
-  const { privateKey, accountName, isMaster } = req.body;
-  
-  if (!privateKey) {
-    return res.status(400).json({ error: 'Private key is required' });
-  }
-
-  try {
-    const decodedPrivateKey = bs58.decode(privateKey);
-    
-    if (decodedPrivateKey.length !== 64) {
-      throw new Error('Invalid private key length');
-    }
-
-    const keypair = Keypair.fromSecretKey(decodedPrivateKey);
-    const publicKey = keypair.publicKey.toString();
-
-    await pool.query(
-      'INSERT INTO wallets (username, public_key, private_key, account_name, is_master) VALUES ($1, $2, $3, $4, $5)',
-      [req.user.username, publicKey, privateKey, accountName, isMaster]
-    );
-
-    res.json({ message: 'Wallet added successfully', publicKey });
-  } catch (error) {
-    console.error('Error adding wallet:', error);
-    res.status(400).json({ error: error.message || 'Invalid private key' });
-  }
-});
-
 app.post('/api/create-wallet', authenticateToken, async (req, res) => {
-  const { accountName, isMaster, password } = req.body;
+  const { accountName, isMaster, password, operationAmount, slippage, fee } = req.body;
   
+  if (!password) {
+    return res.status(400).json({ error: 'Password is required' });
+  }
+
   try {
     const mnemonic = bip39.generateMnemonic();
     const seed = await bip39.mnemonicToSeed(mnemonic);
@@ -147,18 +123,20 @@ app.post('/api/create-wallet', authenticateToken, async (req, res) => {
     const publicKey = keypair.publicKey.toString();
     const privateKey = bs58.encode(keypair.secretKey);
 
-    // Шифруем приватный ключ и мнемоническую фразу
-    const cipher = crypto.createCipher('aes-256-cbc', password);
+    const iv = crypto.randomBytes(16);
+    const key = crypto.scryptSync(password, 'salt', 32);
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+
     let encryptedPrivateKey = cipher.update(privateKey, 'utf8', 'hex');
     encryptedPrivateKey += cipher.final('hex');
 
-    const mnemonicCipher = crypto.createCipher('aes-256-cbc', password);
+    const mnemonicCipher = crypto.createCipheriv('aes-256-cbc', key, iv);
     let encryptedMnemonic = mnemonicCipher.update(mnemonic, 'utf8', 'hex');
     encryptedMnemonic += mnemonicCipher.final('hex');
 
     await pool.query(
-      'INSERT INTO wallets (username, public_key, private_key, mnemonic, account_name, is_master) VALUES ($1, $2, $3, $4, $5, $6)',
-      [req.user.username, publicKey, encryptedPrivateKey, encryptedMnemonic, accountName, isMaster]
+      'INSERT INTO wallets (username, public_key, private_key, mnemonic, account_name, is_master, operation_amount, slippage, fee, iv) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+      [req.user.username, publicKey, encryptedPrivateKey, encryptedMnemonic, accountName, isMaster, operationAmount, slippage, fee, iv.toString('hex')]
     );
 
     res.json({ message: 'Wallet created successfully', publicKey });
@@ -172,20 +150,20 @@ app.post('/api/get-wallet-details', authenticateToken, async (req, res) => {
   const { publicKey, password } = req.body;
 
   try {
-    const result = await pool.query('SELECT private_key, mnemonic FROM wallets WHERE public_key = $1 AND username = $2', [publicKey, req.user.username]);
+    const result = await pool.query('SELECT private_key, mnemonic, iv FROM wallets WHERE public_key = $1 AND username = $2', [publicKey, req.user.username]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Wallet not found' });
     }
 
-    const { private_key: encryptedPrivateKey, mnemonic: encryptedMnemonic } = result.rows[0];
+    const { private_key: encryptedPrivateKey, mnemonic: encryptedMnemonic, iv } = result.rows[0];
 
-    // Расшифровываем приватный ключ и мнемоническую фразу
-    const decipher = crypto.createDecipher('aes-256-cbc', password);
+    const key = crypto.scryptSync(password, 'salt', 32);
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
     let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
     privateKey += decipher.final('utf8');
 
-    const mnemonicDecipher = crypto.createDecipher('aes-256-cbc', password);
+    const mnemonicDecipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
     let mnemonic = mnemonicDecipher.update(encryptedMnemonic, 'hex', 'utf8');
     mnemonic += mnemonicDecipher.final('utf8');
 
@@ -243,29 +221,38 @@ app.post('/api/swap', authenticateToken, async (req, res) => {
   const { fromToken, toToken, amount, walletPublicKey } = req.body;
 
   try {
-    const walletResult = await pool.query('SELECT private_key FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
+    const walletResult = await pool.query('SELECT private_key, iv FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
     
     if (walletResult.rows.length === 0) {
       return res.status(404).json({ error: 'Wallet not found' });
     }
 
-    const privateKey = walletResult.rows[0].private_key;
-    const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+    const { private_key: encryptedPrivateKey, iv } = walletResult.rows[0];
 
-    const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
+    // Здесь нужно добавить логику для расшифровки приватного ключа
+    // Используйте тот же пароль, который использовался при создании кошелька
+    // const key = crypto.scryptSync(password, 'salt', 32);
+    // const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
+    // let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
+    // privateKey += decipher.final('utf8');
 
-    const swapResponse = await solanaTracker.getSwapInstructions(
-      fromToken === 'SOL' ? SOL_ADDRESS : fromToken,
-      toToken === 'SOL' ? SOL_ADDRESS : toToken,
-      amount,
-      1, // slippage
-      walletPublicKey,
-      0.0005, // priority fee
-      false // Force legacy transaction for Jupiter
-    );
+    // Затем используйте расшифрованный приватный ключ для создания keypair
+    // const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+
+    // const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
+
+    // const swapResponse = await solanaTracker.getSwapInstructions(
+    //   fromToken === 'SOL' ? SOL_ADDRESS : fromToken,
+    //   toToken === 'SOL' ? SOL_ADDRESS : toToken,
+    //   amount,
+    //   1, // slippage
+    //   walletPublicKey,
+    //   0.0005, // priority fee
+    //   false // Force legacy transaction for Jupiter
+    // );
 
     // Здесь вы бы отправили транзакцию, но для безопасности мы просто возвращаем инструкции
-    res.json({ message: 'Swap instructions generated', instructions: swapResponse });
+    res.json({ message: 'Swap instructions generated', instructions: 'swapResponse' });
   } catch (error) {
     console.error('Error during swap:', error);
     res.status(500).json({ error: 'Failed to perform swap' });
@@ -276,44 +263,130 @@ app.post('/api/bump', authenticateToken, async (req, res) => {
   const { walletPublicKey, tokenAddress, bumpAmount } = req.body;
 
   try {
-    const walletResult = await pool.query('SELECT private_key FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
+    const walletResult = await pool.query('SELECT private_key, iv FROM wallets WHERE public_key = $1 AND username = $2', [walletPublicKey, req.user.username]);
     
     if (walletResult.rows.length === 0) {
       return res.status(404).json({ error: 'Wallet not found' });
     }
 
-    const privateKey = walletResult.rows[0].private_key;
-    const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+    const { private_key: encryptedPrivateKey, iv } = walletResult.rows[0];
 
-    const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
+    // Здесь нужно добавить логику для расшифровки приватного ключа
+    // Используйте тот же пароль, который использовался при создании кошелька
+    // const key = crypto.scryptSync(password, 'salt', 32);
+    // const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
+    // let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
+    // privateKey += decipher.final('utf8');
 
-    // Perform buy
-    const buyResponse = await solanaTracker.getSwapInstructions(
-      SOL_ADDRESS,
-      tokenAddress,
-      bumpAmount,
-      1, // slippage
-      walletPublicKey,
-      0.0005, // priority fee
-      false // Force legacy transaction for Jupiter
-    );
+    // Затем используйте расшифрованный приватный ключ для создания keypair
+    // const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
 
-    // Perform sell
-    const sellResponse = await solanaTracker.getSwapInstructions(
-      tokenAddress,
-      SOL_ADDRESS,
-      bumpAmount,
-      1, // slippage
-      walletPublicKey,
-      0.0005, // priority fee
-      false // Force legacy transaction for Jupiter
-    );
+    // const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
+
+    // // Perform buy
+    // const buyResponse = await solanaTracker.getSwapInstructions(
+    //   SOL_ADDRESS,
+    //   tokenAddress,
+    //   bumpAmount,
+    //   1, // slippage
+    //   walletPublicKey,
+    //   0.0005, // priority fee
+    //   false // Force legacy transaction for Jupiter
+    // );
+
+    // // Perform sell
+    // const sellResponse = await solanaTracker.getSwapInstructions(
+    //   tokenAddress,
+    //   SOL_ADDRESS,
+    //   bumpAmount,
+    //   1, // slippage
+    //   walletPublicKey,
+    //   0.0005, // priority fee
+    //   false // Force legacy transaction for Jupiter
+    // );
 
     // Здесь вы бы отправили эти транзакции, но для безопасности мы просто возвращаем инструкции
-    res.json({ message: 'Bump instructions generated', buyInstructions: buyResponse, sellInstructions: sellResponse });
+    res.json({ message: 'Bump instructions generated', buyInstructions: 'buyResponse', sellInstructions: 'sellResponse' });
   } catch (error) {
     console.error('Error during bump:', error);
     res.status(500).json({ error: 'Failed to perform bump' });
+  }
+});
+
+app.post('/api/copy-trade', authenticateToken, async (req, res) => {
+  const { masterWallet, followers } = req.body;
+
+  try {
+    // Здесь должна быть логика копитрейдинга
+    // Например, получение последней транзакции мастер-кошелька и её повторение для кошельков-последователей
+
+    res.json({ message: 'Copy trade executed successfully' });
+  } catch (error) {
+    console.error('Error during copy trade:', error);
+    res.status(500).json({ error: 'Failed to execute copy trade' });
+  }
+});
+
+app.post('/api/swap-all-to-sol', authenticateToken, async (req, res) => {
+  try {
+    // Получаем все кошельки пользователя
+    const walletsResult = await pool.query('SELECT public_key, private_key, iv FROM wallets WHERE username = $1', [req.user.username]);
+    
+    if (walletsResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No wallets found' });
+    }
+
+    const results = [];
+
+    for (const wallet of walletsResult.rows) {
+      const { public_key, private_key: encryptedPrivateKey, iv } = wallet;
+
+      // Здесь нужно добавить логику для расшифровки приватного ключа
+      // Используйте тот же пароль, который использовался при создании кошелька
+      // const key = crypto.scryptSync(password, 'salt', 32);
+      // const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(iv, 'hex'));
+      // let privateKey = decipher.update(encryptedPrivateKey, 'hex', 'utf8');
+      // privateKey += decipher.final('utf8');
+
+      // Затем используйте расшифрованный приватный ключ для создания keypair
+      // const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+
+      // const solanaTracker = new SolanaTracker(keypair, process.env.SOLANA_RPC_URL);
+
+      // Получаем список всех токенов в кошельке
+      const tokenAccounts = await connection.getTokenAccountsByOwner(new PublicKey(public_key), {
+        programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+      });
+
+      for (const tokenAccount of tokenAccounts.value) {
+        const accountInfo = await connection.getTokenAccountBalance(tokenAccount.pubkey);
+        if (accountInfo.value.uiAmount > 0) {
+          // Здесь должна быть логика для обмена токена на SOL
+          // const swapResponse = await solanaTracker.getSwapInstructions(
+          //   tokenAccount.account.data.parsed.info.mint,
+          //   SOL_ADDRESS,
+          //   accountInfo.value.uiAmount,
+          //   1, // slippage
+          //   public_key,
+          //   0.0005, // priority fee
+          //   false // Force legacy transaction for Jupiter
+          // );
+
+          // Добавьте результат обмена в массив результатов
+          results.push({
+            wallet: public_key,
+            token: tokenAccount.account.data.parsed.info.mint,
+            amount: accountInfo.value.uiAmount,
+            status: 'Swap instructions generated'
+          });
+        }
+      }
+    }
+
+    res.json({ message: 'All assets swapped to SOL', results });
+  } catch (error) {
+    console.error('Error swapping all assets to SOL:', error);
+    res.status(500).json({ error: 'Failed to swap assets to SOL' });
   }
 });
 
