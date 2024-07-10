@@ -60,7 +60,7 @@ const ViewPrivateKey = ({ publicKey }) => {
       setPrivateKey(response.data.privateKey);
     } catch (error) {
       console.error('Error viewing private key:', error);
-      alert('Failed to view private key');
+      alert('Failed to view private key: ' + (error.response?.data?.error || error.message));
     }
   };
 
