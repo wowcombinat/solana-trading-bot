@@ -1,4 +1,3 @@
-// src/components/CopyTrading.js
 import React, { useState } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
@@ -18,10 +17,6 @@ const Select = styled.select`
   padding: 5px;
 `;
 
-const Input = styled.input`
-  padding: 5px;
-`;
-
 const Button = styled.button`
   padding: 10px;
   background-color: ${props => props.theme.primary};
@@ -33,16 +28,11 @@ const Button = styled.button`
 const CopyTrading = ({ wallets }) => {
   const [masterWallet, setMasterWallet] = useState('');
   const [followers, setFollowers] = useState([]);
-  const [amount, setAmount] = useState('');
 
   const handleCopyTrade = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/api/copy-trade', 
-        { masterWallet, followers, amount },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.post('/api/copy-trade', { masterWallet, followers });
       alert('Copy trade executed successfully');
     } catch (error) {
       console.error('Error executing copy trade:', error);
@@ -80,13 +70,6 @@ const CopyTrading = ({ wallets }) => {
             </label>
           ))}
         </div>
-        <Input
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Amount for followers"
-          required
-        />
         <Button type="submit">Execute Copy Trade</Button>
       </Form>
     </CopyTradingWrapper>
