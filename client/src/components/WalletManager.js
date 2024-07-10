@@ -82,7 +82,8 @@ const WalletManager = ({ wallets, onWalletUpdated }) => {
         onWalletUpdated();
       } else {
         throw new Error('Failed to toggle bot');
-      } catch (error) {
+      }
+    } catch (error) {
       console.error('Error toggling bot:', error);
       alert('Failed to toggle bot: ' + (error.response?.data?.error || error.message));
     }
