@@ -10,7 +10,6 @@
     "axios": "^0.21.1",
     "ajv": "^6.12.6",
     "ajv-keywords": "^3.5.2",
-    "@solana/spl-token": "^0.3.7",
     "socket.io-client": "^4.5.1"
   },
   "scripts": {
